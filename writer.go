@@ -59,7 +59,9 @@ func drain(source <-chan *Event) {
 
 // Respond reads Events from a channel and writes SSE HTTP reponse. This
 // function uses SSE configuration stored in cfg, if nill is passed default SSE
-// configuration from DefaultConfig global variable will be used.
+// configuration from DefaultConfig global variable will be used. This function
+// provides a lower level API that allows manually generating SSE stream. In
+// most cases this function should not be used directly.
 //
 // Stop is an optional channel for stopping SSE stream, if this channel is
 // closed or a value is received on it SSE stream will close. Please note that
