@@ -91,7 +91,7 @@ func (s *Stream) Publish(event *Event) {
 //
 // Subscribe on a stopped stream will cause panic.
 func (s *Stream) Subscribe(w http.ResponseWriter, lastEventID interface{}) error {
-	source := make(chan *Event, 16)
+	source := make(chan *Event, s.cfg.QueueLength)
 	toID := s.subscribe(source)
 	defer s.unsubscribe(source)
 

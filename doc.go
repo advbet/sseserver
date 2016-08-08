@@ -1,8 +1,9 @@
 // Package ssestream is a library for creating SSE server HTTP handlers.
 //
-// This library provides a publish/subscribe interface for generating SSE events
-// stream. It handles keep-alive messages, allows setting reconnect server and
-// client reconnect timeouts. Message data are always marshaled to JSON.
+// This library provides a publish/subscribe interface for generating SSE
+// streams. It handles keep-alive messages, allows setting client reconnect
+// timeout, automatically disconnect long-lived connections. Message data are
+// always marshaled to JSON.
 //
 // This library provides an interface that allows resyncing client state after
 // reconnect.

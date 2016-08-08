@@ -30,6 +30,11 @@ type Config struct {
 	// open before a forced reconnect. Setting Lifetime to zero allows SSE
 	// connections to be open indefinitely.
 	Lifetime time.Duration
+
+	// QueueLength is the maximum number of events pending to be transmitted
+	// to the client before connection is closed. Note queue length of 0
+	// should be never used, recommended size is 32.
+	QueueLength int
 }
 
 // Event holds data for single event in SSE stream.
@@ -41,9 +46,10 @@ type Event struct {
 
 // DefaultConfig is a recommended SSE configuration.
 var DefaultConfig = Config{
-	Reconnect: 500 * time.Millisecond,
-	KeepAlive: 30 * time.Second,
-	Lifetime:  5 * time.Minute,
+	Reconnect:   500 * time.Millisecond,
+	KeepAlive:   30 * time.Second,
+	Lifetime:    5 * time.Minute,
+	QueueLength: 32,
 }
 
 var errFlusherIface = errors.New("http.ResponseWriter does not implement http.Flusher interface")
