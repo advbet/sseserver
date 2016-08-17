@@ -14,7 +14,7 @@ func voidLookup(fromID, toID interface{}) (events []Event, ok bool) {
 // published event ID
 func TestStreamLastID(t *testing.T) {
 	s := NewGeneric(voidLookup, nil, DefaultConfig).(*stream)
-	defer s.Stop(false)
+	defer s.Stop()
 
 	// Before any publishings last ID will be nil
 	lastID := s.subscribe(make(chan *Event))
@@ -35,7 +35,7 @@ func TestStreamStop(t *testing.T) {
 	sub := make(chan *Event, 10)
 	s.subscribe(sub)
 
-	s.Stop(false)
+	s.Stop()
 
 	// reading from closed channel should fail
 	_, ok := <-sub
@@ -46,7 +46,7 @@ func TestStreamStop(t *testing.T) {
 // subscribers.
 func TestStreamPublish(t *testing.T) {
 	s := NewGeneric(voidLookup, nil, DefaultConfig).(*stream)
-	defer s.Stop(false)
+	defer s.Stop()
 	event := &Event{ID: 15, Event: "test", Data: "ok"}
 	subs := []chan *Event{
 		make(chan *Event, 10),
@@ -70,7 +70,7 @@ func TestStreamPublish(t *testing.T) {
 // unsubscribed and closed.
 func TestStreamPublishFull(t *testing.T) {
 	s := NewGeneric(voidLookup, nil, DefaultConfig).(*stream)
-	defer s.Stop(false)
+	defer s.Stop()
 
 	sub := make(chan *Event, 3)
 	s.subscribe(sub)
@@ -95,7 +95,7 @@ func TestStreamPublishFull(t *testing.T) {
 // TestStreamUnsubscribe checks if unsubscribing closes events channel
 func TestStreamUnsubscribe(t *testing.T) {
 	s := NewGeneric(voidLookup, nil, DefaultConfig).(*stream)
-	defer s.Stop(false)
+	defer s.Stop()
 
 	sub := make(chan *Event, 3)
 	s.subscribe(sub)

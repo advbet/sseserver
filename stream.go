@@ -16,22 +16,25 @@ type Stream interface {
 	// Publish on a stopped stream will cause panic.
 	Publish(event *Event)
 
+	// DropSubscribers removes all currently active stream subscribers and
+	// close all active HTTP responses. After call to this method all new
+	// subscribers would be closed immediately. Calling DropSubscribers more
+	// than one time would panic.
+	//
+	// This function is useful in implementing graceful application
+	// shutdown, this method should be called only when web server are not
+	// accepting any new connections and all that is left is terminating
+	// already connected ones.
+	DropSubscribers()
+
 	// Stop closes event stream. It will disconnect all connected
 	// subscribers and deallocate all resources used for the stream. After
 	// stream is stopped it can not started again and should not be used
 	// anymore.
 	//
-	// If dropQueued is false, subscriber connections would be closed only
-	// when all events are sent (some slower clients might have some events
-	// sitting in a transmit queue).
-	//
-	// If dropQueued is true subscribers queues are dropped and subscribers
-	// are disconnected immediately. Dropping connections immediately can be
-	// used to speed up application shutdown.
-	//
 	// Calls to Publish or Subscribe after stream was stopped will cause
 	// panic.
-	Stop(dropQueued bool)
+	Stop()
 
 	// Subscribe handled HTTP request to receive SSE stream. Caller of this
 	// function should parse Last-Event-ID header and create appropriate
@@ -136,24 +139,24 @@ func (s *stream) Subscribe(w http.ResponseWriter, lastEventID interface{}) error
 	return Respond(w, prependStream(events, source), &s.cfg, s.responseStop)
 }
 
+// DropSubscribers removes all currently active stream subscribers and close all
+// active HTTP responses. After call to this method all new subscribers would be
+// closed immediately. Calling DropSubscribers more than one time would panic.
+//
+// This function is useful in implementing graceful application shutdown, this
+// method should be called only when web server are not accepting any new
+// connections and all that is left is terminating already connected ones.
+func (s *stream) DropSubscribers() {
+	close(s.responseStop)
+}
+
 // Stop closes event stream. It will disconnect all connected subscribers and
 // deallocate all resources used for the stream. After stream is stopped it can
 // not started again and should not be used anymore.
 //
-// If dropQueued is false, subscriber connections would be closed only when
-// all events are sent (some slower clients might have some events sitting in a
-// transmit queue).
-//
-// If dropQueued is true subscribers queues are dropped and subscribers are
-// disconnected immediately. Dropping connections immediately can be used to
-// speed up application shutdown.
-//
 // Calls to Publish or Subscribe after stream was stopped will cause panic.
-func (s *stream) Stop(dropQueued bool) {
+func (s *stream) Stop() {
 	close(s.cmd)
-	if dropQueued {
-		close(s.responseStop)
-	}
 	s.wg.Wait()
 }
 
