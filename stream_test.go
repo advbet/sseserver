@@ -13,7 +13,7 @@ func voidLookup(fromID, toID interface{}) (events []Event, ok bool) {
 // TestStreamLastID checks if subscribing to stream correctly returns last
 // published event ID
 func TestStreamLastID(t *testing.T) {
-	s := New(voidLookup, nil, DefaultConfig)
+	s := NewGeneric(voidLookup, nil, DefaultConfig).(*stream)
 	defer s.Stop(false)
 
 	// Before any publishings last ID will be nil
@@ -31,7 +31,7 @@ func TestStreamLastID(t *testing.T) {
 
 // TestStreamStop cheks if stopping stream closes all subscribers.
 func TestStreamStop(t *testing.T) {
-	s := New(voidLookup, nil, DefaultConfig)
+	s := NewGeneric(voidLookup, nil, DefaultConfig).(*stream)
 	sub := make(chan *Event, 10)
 	s.subscribe(sub)
 
@@ -45,7 +45,7 @@ func TestStreamStop(t *testing.T) {
 // TestStreamPublish cheks if published event is broadcasted to all of the
 // subscribers.
 func TestStreamPublish(t *testing.T) {
-	s := New(voidLookup, nil, DefaultConfig)
+	s := NewGeneric(voidLookup, nil, DefaultConfig).(*stream)
 	defer s.Stop(false)
 	event := &Event{ID: 15, Event: "test", Data: "ok"}
 	subs := []chan *Event{
@@ -69,7 +69,7 @@ func TestStreamPublish(t *testing.T) {
 // TestStreamPublishFull cheks if subscribers with full channels are
 // unsubscribed and closed.
 func TestStreamPublishFull(t *testing.T) {
-	s := New(voidLookup, nil, DefaultConfig)
+	s := NewGeneric(voidLookup, nil, DefaultConfig).(*stream)
 	defer s.Stop(false)
 
 	sub := make(chan *Event, 3)
@@ -94,7 +94,7 @@ func TestStreamPublishFull(t *testing.T) {
 
 // TestStreamUnsubscribe checks if unsubscribing closes events channel
 func TestStreamUnsubscribe(t *testing.T) {
-	s := New(voidLookup, nil, DefaultConfig)
+	s := NewGeneric(voidLookup, nil, DefaultConfig).(*stream)
 	defer s.Stop(false)
 
 	sub := make(chan *Event, 3)

@@ -52,7 +52,7 @@ func lookupEvents(fromI interface{}, toI interface{}) ([]Event, bool) {
 	}
 }
 
-func eventGenerator(stream *Stream) {
+func eventGenerator(stream Stream) {
 	i := 0
 	c := time.Tick(time.Second)
 
@@ -63,7 +63,7 @@ func eventGenerator(stream *Stream) {
 }
 
 func Example() {
-	stream := New(lookupEvents, 0, DefaultConfig)
+	stream := NewGeneric(lookupEvents, 0, DefaultConfig)
 	go eventGenerator(stream)
 
 	requestHandler := func(w http.ResponseWriter, r *http.Request) {

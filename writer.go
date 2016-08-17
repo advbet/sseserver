@@ -63,25 +63,24 @@ func drain(source <-chan *Event) {
 	}()
 }
 
-// Respond reads Events from a channel and writes SSE HTTP reponse. This
-// function uses SSE configuration stored in cfg, if nill is passed default SSE
-// configuration from DefaultConfig global variable will be used. This function
+// Respond reads Events from a channel and writes SSE HTTP reponse. function
 // provides a lower level API that allows manually generating SSE stream. In
 // most cases this function should not be used directly.
 //
+// Cfg is SSE stream configuration, if nil is passed configuration from
+// DefaultConfiguration global will be used.
+//
 // Stop is an optional channel for stopping SSE stream, if this channel is
-// closed or a value is received on it SSE stream will close. Please note that
-// receiving a value on stop channel will close only one SSE stream if multiple
-// stream shares single stop channel. If stream stopping functionality is not
-// required Stop should be set to nil.
+// closed SSE stream will stopped and http connection closed. If stream stopping
+// functionality is not required Stop should be set to nil.
 //
 // This function returns nil if end of stream is reached, stream lifetime
 // expired, client closes the connection or request to stop is received on the
 // stop channel. Otherwise it returns an error.
 //
 // Note! After passing source channel to Stream it cannot be reused (for example
-// passed to the Stream function again). This function will start a new
-// goroutine to drain source channel on exit.
+// passed to the Stream function again). This function will drain source channel
+// on exit.
 func Respond(w http.ResponseWriter, source <-chan *Event, cfg *Config, stop <-chan struct{}) error {
 	// Draining the source stream can help protect against resource leaks if
 	// too small source chan buffer size was used and producer is stuck on

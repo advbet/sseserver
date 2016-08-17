@@ -9,9 +9,41 @@ import (
 // created for each SSE stream available in the application. Application can
 // broadcast streams using stream.Publish method. HTTP handlers for SSE client
 // endpoints should use stream.Subscribe to tap into the event stream.
-type Stream struct {
+type Stream interface {
+	// Publish broadcast given event to all currently connected clients
+	// (subscribers).
+	//
+	// Publish on a stopped stream will cause panic.
+	Publish(event *Event)
+
+	// Stop closes event stream. It will disconnect all connected
+	// subscribers and deallocate all resources used for the stream. After
+	// stream is stopped it can not started again and should not be used
+	// anymore.
+	//
+	// If dropQueued is false, subscriber connections would be closed only
+	// when all events are sent (some slower clients might have some events
+	// sitting in a transmit queue).
+	//
+	// If dropQueued is true subscribers queues are dropped and subscribers
+	// are disconnected immediately. Dropping connections immediately can be
+	// used to speed up application shutdown.
+	//
+	// Calls to Publish or Subscribe after stream was stopped will cause
+	// panic.
+	Stop(dropQueued bool)
+
+	// Subscribe handled HTTP request to receive SSE stream. Caller of this
+	// function should parse Last-Event-ID header and create appropriate
+	// lastEventID object.
+	//
+	// Subscribe on a stopped stream will cause panic.
+	Subscribe(w http.ResponseWriter, lastEventID interface{}) error
+}
+
+type stream struct {
 	cmd          chan command
-	retrieve     EventLookupFn
+	resync       ResyncFn
 	cfg          Config
 	responseStop chan struct{}
 
@@ -33,7 +65,7 @@ type command struct {
 	event    *Event             // used for publish
 }
 
-// EventLookupFn is a definition of function used to lookup events missed by
+// ResyncFn is a definition of function used to lookup events missed by
 // client reconnects. Users of this package must provide an implementation of
 // this function when creating new streams.
 //
@@ -46,7 +78,7 @@ type command struct {
 // New() function and client have connected to the SSE stream before any events
 // were published using stream.Publish.
 //
-// EventLookupFn should return all events in a given range in a slice. Second
+// ResyncFn should return all events in a given range in a slice. Second
 // return variable ok should be set to true if result contains all the requested
 // events, false otherwise. With the help of second argument this function can
 // limit number of returned events to save resources. Returning false from this
@@ -55,18 +87,18 @@ type command struct {
 //
 // Correct implementation of this function is essential for proper client
 // resync and vital to whole SSE functionality.
-type EventLookupFn func(fromID, toID interface{}) (events []Event, ok bool)
+type ResyncFn func(fromID, toID interface{}) (events []Event, ok bool)
 
-// New creates a new instance of SSE stream. Creating new stream requires to
-// provide a resync function with EventLookupFn signature. It is used to
+// NewGeneric creates a new instance of SSE stream. Creating new stream requires
+// to provide a resync function with ResyncFn signature. It is used to
 // generate a list of events that client might have missed during a reconnect.
 // Argument lastID is used set last event ID that was published before
 // application was started, this value is passed to the resync function and
 // later replaced by the events published with stream.Publish method.
-func New(resync EventLookupFn, lastID interface{}, cfg Config) *Stream {
-	s := &Stream{
+func NewGeneric(resync ResyncFn, lastID interface{}, cfg Config) Stream {
+	s := &stream{
 		cmd:          make(chan command),
-		retrieve:     resync,
+		resync:       resync,
 		cfg:          cfg,
 		responseStop: make(chan struct{}),
 	}
@@ -79,7 +111,7 @@ func New(resync EventLookupFn, lastID interface{}, cfg Config) *Stream {
 // (subscribers).
 //
 // Publish on a stopped stream will cause panic.
-func (s *Stream) Publish(event *Event) {
+func (s *stream) Publish(event *Event) {
 	s.cmd <- command{
 		op:    publish,
 		event: event,
@@ -90,14 +122,14 @@ func (s *Stream) Publish(event *Event) {
 // should parse Last-Event-ID header and create appropriate lastEventID object.
 //
 // Subscribe on a stopped stream will cause panic.
-func (s *Stream) Subscribe(w http.ResponseWriter, lastEventID interface{}) error {
+func (s *stream) Subscribe(w http.ResponseWriter, lastEventID interface{}) error {
 	source := make(chan *Event, s.cfg.QueueLength)
 	toID := s.subscribe(source)
 	defer s.unsubscribe(source)
 
 	// lastEventID will be nil if client connects for the first time
 	// serverID will be nil if server did not send any events yet
-	events, ok := s.retrieve(lastEventID, toID)
+	events, ok := s.resync(lastEventID, toID)
 	if !ok {
 		return Respond(w, prependStream(events, nil), &s.cfg, s.responseStop)
 	}
@@ -117,7 +149,7 @@ func (s *Stream) Subscribe(w http.ResponseWriter, lastEventID interface{}) error
 // speed up application shutdown.
 //
 // Calls to Publish or Subscribe after stream was stopped will cause panic.
-func (s *Stream) Stop(dropQueued bool) {
+func (s *stream) Stop(dropQueued bool) {
 	close(s.cmd)
 	if dropQueued {
 		close(s.responseStop)
@@ -127,7 +159,7 @@ func (s *Stream) Stop(dropQueued bool) {
 
 // subscribe is a helper function for adding a subscription, safe for concurrent
 // access.
-func (s *Stream) subscribe(ch chan<- *Event) interface{} {
+func (s *stream) subscribe(ch chan<- *Event) interface{} {
 	response := make(chan interface{}, 1)
 	s.cmd <- command{
 		op:       subscribe,
@@ -141,7 +173,7 @@ func (s *Stream) subscribe(ch chan<- *Event) interface{} {
 
 // unsubscribe is a helper function for removing a subscription, safe for
 // concurrent access.
-func (s *Stream) unsubscribe(ch chan<- *Event) {
+func (s *stream) unsubscribe(ch chan<- *Event) {
 	s.cmd <- command{
 		op:   unsubscribe,
 		sink: ch,
@@ -150,7 +182,7 @@ func (s *Stream) unsubscribe(ch chan<- *Event) {
 
 // run handles events broadcasting and manages subscription lists. Each active
 // stream must have a single goroutine executing this code.
-func (s *Stream) run(lastID interface{}) {
+func (s *stream) run(lastID interface{}) {
 	defer s.wg.Done()
 	sinks := make(map[chan<- *Event]struct{})
 
