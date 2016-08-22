@@ -116,7 +116,8 @@ func Respond(w http.ResponseWriter, source <-chan *Event, cfg *Config, stop <-ch
 
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Set("Connection", "keep-alive")
+	// Instruct nginx to disable buffering
+	w.Header().Set("X-Accel-Buffering", "no")
 
 	if cfg.Reconnect != 0 {
 		if _, err := fmt.Fprintf(w, "retry: %d\n\n", cfg.Reconnect/time.Millisecond); err != nil {
