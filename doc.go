@@ -1,4 +1,4 @@
-// Package ssestream is a library for creating SSE server HTTP handlers.
+// Package sseserver is a library for creating SSE server HTTP handlers.
 //
 // This library provides a publish/subscribe interface for generating SSE
 // streams. It handles keep-alive messages, allows setting client reconnect
@@ -20,4 +20,4 @@
 //	  up old events.
 //	* If graceful shutdown or dynamic stream creation is required use Stop()
 //	  method to deallocate resources and disconnect existing clients.
-package ssestream
+package sseserver

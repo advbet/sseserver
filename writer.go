@@ -1,4 +1,4 @@
-package ssestream
+package sseserver
 
 import (
 	"encoding/json"
