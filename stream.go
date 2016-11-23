@@ -61,13 +61,6 @@ const (
 	publish
 )
 
-type command struct {
-	op       operation
-	sink     chan<- *Event      // used for subscribe, unsubscribe
-	response chan<- interface{} // used for subscribe
-	event    *Event             // used for publish
-}
-
 // ResyncFn is a definition of function used to lookup events missed by
 // client reconnects. Users of this package must provide an implementation of
 // this function when creating new streams.
@@ -106,7 +99,10 @@ func NewGeneric(resync ResyncFn, lastID interface{}, cfg Config) Stream {
 		responseStop: make(chan struct{}),
 	}
 	s.wg.Add(1)
-	go s.run(lastID)
+	go func() {
+		defer s.wg.Done()
+		brokerRun(s.cmd, lastID)
+	}()
 	return s
 }
 
@@ -180,46 +176,6 @@ func (s *stream) unsubscribe(ch chan<- *Event) {
 	s.cmd <- command{
 		op:   unsubscribe,
 		sink: ch,
-	}
-}
-
-// run handles events broadcasting and manages subscription lists. Each active
-// stream must have a single goroutine executing this code.
-func (s *stream) run(lastID interface{}) {
-	defer s.wg.Done()
-	sinks := make(map[chan<- *Event]struct{})
-
-	for cmd := range s.cmd {
-		switch cmd.op {
-		case subscribe:
-			sinks[cmd.sink] = struct{}{}
-
-			// return last seen event ID to the subscriber
-			cmd.response <- lastID
-			close(cmd.response)
-		case unsubscribe:
-			if _, ok := sinks[cmd.sink]; ok {
-				close(cmd.sink)
-				delete(sinks, cmd.sink)
-			}
-		case publish:
-			lastID = cmd.event.ID
-			for ch := range sinks {
-				select {
-				case ch <- cmd.event:
-					// Success
-				default:
-					// Client is too slow, close stream and
-					// wait for client reconnect
-					close(ch)
-					delete(sinks, ch)
-				}
-			}
-		}
-	}
-
-	for ch := range sinks {
-		close(ch)
 	}
 }
 

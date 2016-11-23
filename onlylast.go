@@ -20,7 +20,10 @@ func NewLastOnly(cfg Config) Stream {
 	}
 	s.stream.resync = s.resync
 	s.wg.Add(1)
-	go s.run(nil)
+	go func() {
+		defer s.wg.Done()
+		brokerRun(s.cmd, nil)
+	}()
 
 	return s
 }
