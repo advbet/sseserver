@@ -6,7 +6,7 @@ import (
 )
 
 type stream struct {
-	cmd          chan command
+	broker       brokerChan
 	resync       ResyncFn
 	cfg          Config
 	responseStop chan struct{}
@@ -22,7 +22,7 @@ type stream struct {
 // later replaced by the events published with stream.Publish method.
 func NewGeneric(resync ResyncFn, lastID interface{}, cfg Config) Stream {
 	s := &stream{
-		cmd:          make(chan command),
+		broker:       newBroker(),
 		resync:       resync,
 		cfg:          cfg,
 		responseStop: make(chan struct{}),
@@ -30,7 +30,7 @@ func NewGeneric(resync ResyncFn, lastID interface{}, cfg Config) Stream {
 	s.wg.Add(1)
 	go func() {
 		defer s.wg.Done()
-		brokerRun(s.cmd, lastID)
+		s.broker.run(lastID)
 	}()
 	return s
 }
@@ -40,10 +40,7 @@ func NewGeneric(resync ResyncFn, lastID interface{}, cfg Config) Stream {
 //
 // Publish on a stopped stream will cause panic.
 func (s *stream) Publish(event *Event) {
-	s.cmd <- command{
-		op:    publish,
-		event: event,
-	}
+	s.broker.publish(event)
 }
 
 // Subscribe handled HTTP request to receive SSE stream. Caller of this function
@@ -52,8 +49,8 @@ func (s *stream) Publish(event *Event) {
 // Subscribe on a stopped stream will cause panic.
 func (s *stream) Subscribe(w http.ResponseWriter, lastEventID interface{}) error {
 	source := make(chan *Event, s.cfg.QueueLength)
-	toID := s.subscribe(source)
-	defer s.unsubscribe(source)
+	toID := s.broker.subscribe(source)
+	defer s.broker.unsubscribe(source)
 
 	// lastEventID will be nil if client connects for the first time
 	// serverID will be nil if server did not send any events yet
@@ -81,31 +78,8 @@ func (s *stream) DropSubscribers() {
 //
 // Calls to Publish or Subscribe after stream was stopped will cause panic.
 func (s *stream) Stop() {
-	close(s.cmd)
+	close(s.broker)
 	s.wg.Wait()
-}
-
-// subscribe is a helper function for adding a subscription, safe for concurrent
-// access.
-func (s *stream) subscribe(ch chan<- *Event) interface{} {
-	response := make(chan interface{}, 1)
-	s.cmd <- command{
-		op:       subscribe,
-		sink:     ch,
-		response: response,
-	}
-	// stream.run goroutine will write current last seen event ID to this
-	// channel exactly once and close it
-	return <-response
-}
-
-// unsubscribe is a helper function for removing a subscription, safe for
-// concurrent access.
-func (s *stream) unsubscribe(ch chan<- *Event) {
-	s.cmd <- command{
-		op:   unsubscribe,
-		sink: ch,
-	}
 }
 
 // prependStream takes slice and channel of events and and produces new channel

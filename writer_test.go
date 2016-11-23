@@ -28,7 +28,7 @@ func TestRespondWithoutFlusher(t *testing.T) {
 	var w writerNotFlusher
 
 	assert.Panics(t, func() {
-		Respond(w, make(<-chan *Event), nil, nil)
+		_ = Respond(w, make(<-chan *Event), nil, nil)
 	})
 }
 
@@ -133,7 +133,7 @@ func TestRespondCloseNotify(t *testing.T) {
 	time.AfterFunc(closeTimeout, func() { w.closeChan <- true })
 
 	start := time.Now()
-	Respond(w, source, &Config{}, nil)
+	_ = Respond(w, source, &Config{}, nil)
 	end := time.Now()
 
 	assert.WithinDuration(t, start, end, closeTimeout*2)
