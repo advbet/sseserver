@@ -8,6 +8,14 @@ type command struct {
 	event    *Event             // used for publish
 }
 
+type operation int
+
+const (
+	subscribe operation = iota
+	unsubscribe
+	publish
+)
+
 // brokerRun handles event broadcasting and manages subscription lists. Each
 // started stream have this code running in a separate goroutine.
 func brokerRun(cmds <-chan command, lastID interface{}) {
