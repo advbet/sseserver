@@ -16,8 +16,8 @@
 //	  Publish() method.
 //	* Create HTTP handlers that parses Last-Event-ID header, everything else
 //	  is handled by the Subscribe() method.
-//	* Stitch everything together with a resync function that allows looking
-//	  up old events.
-//	* If graceful shutdown or dynamic stream creation is required use Stop()
-//	  method to deallocate resources and disconnect existing clients.
+//	* If graceful web server shutdown is required use DropSubscribers() to
+//	  gracefully disconnect all active streams.
+//      * If dynamic stream creation is required use Stop() to free resources
+//        allocated for sse stream.
 package sseserver

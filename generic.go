@@ -35,18 +35,10 @@ func NewGeneric(resync ResyncFn, lastID interface{}, cfg Config) Stream {
 	return s
 }
 
-// Publish broadcast given event to all currently connected clients
-// (subscribers).
-//
-// Publish on a stopped stream will cause panic.
 func (s *stream) Publish(event *Event) {
 	s.broker.publish(event)
 }
 
-// Subscribe handled HTTP request to receive SSE stream. Caller of this function
-// should parse Last-Event-ID header and create appropriate lastEventID object.
-//
-// Subscribe on a stopped stream will cause panic.
 func (s *stream) Subscribe(w http.ResponseWriter, lastEventID interface{}) error {
 	source := make(chan *Event, s.cfg.QueueLength)
 	toID := s.broker.subscribe(source)
@@ -61,22 +53,10 @@ func (s *stream) Subscribe(w http.ResponseWriter, lastEventID interface{}) error
 	return Respond(w, prependStream(events, source), &s.cfg, s.responseStop)
 }
 
-// DropSubscribers removes all currently active stream subscribers and close all
-// active HTTP responses. After call to this method all new subscribers would be
-// closed immediately. Calling DropSubscribers more than one time would panic.
-//
-// This function is useful in implementing graceful application shutdown, this
-// method should be called only when web server are not accepting any new
-// connections and all that is left is terminating already connected ones.
 func (s *stream) DropSubscribers() {
 	close(s.responseStop)
 }
 
-// Stop closes event stream. It will disconnect all connected subscribers and
-// deallocate all resources used for the stream. After stream is stopped it can
-// not started again and should not be used anymore.
-//
-// Calls to Publish or Subscribe after stream was stopped will cause panic.
 func (s *stream) Stop() {
 	close(s.broker)
 	s.wg.Wait()
