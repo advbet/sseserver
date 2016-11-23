@@ -1,14 +1,16 @@
-package sseserver
+package sseserver_test
 
 import (
 	"fmt"
 	"net/http"
 	"strconv"
 	"time"
+
+	"bitbucket.org/advbet/sseserver"
 )
 
-func newEvent(id int) *Event {
-	return &Event{
+func newEvent(id int) *sseserver.Event {
+	return &sseserver.Event{
 		ID:    id,
 		Event: "counter",
 		Data: map[string]interface{}{
@@ -18,7 +20,7 @@ func newEvent(id int) *Event {
 	}
 }
 
-func lookupEvents(fromI interface{}, toI interface{}) ([]Event, bool) {
+func lookupEvents(fromI interface{}, toI interface{}) ([]sseserver.Event, bool) {
 	if fromI == nil {
 		// New client
 		// no resync, continue sending live events
@@ -34,7 +36,7 @@ func lookupEvents(fromI interface{}, toI interface{}) ([]Event, bool) {
 		return nil, true
 	}
 
-	events := []Event{}
+	events := []sseserver.Event{}
 	if to-from > 10 {
 		// do not resync more than 10 events at a time
 		for i := from + 1; i <= from+10; i++ {
@@ -52,7 +54,7 @@ func lookupEvents(fromI interface{}, toI interface{}) ([]Event, bool) {
 	}
 }
 
-func eventGenerator(stream Stream) {
+func eventGenerator(stream sseserver.Stream) {
 	i := 0
 	c := time.Tick(time.Second)
 
@@ -62,8 +64,8 @@ func eventGenerator(stream Stream) {
 	}
 }
 
-func Example() {
-	stream := NewGeneric(lookupEvents, 0, DefaultConfig)
+func Example_generic() {
+	stream := sseserver.NewGeneric(lookupEvents, 0, sseserver.DefaultConfig)
 	go eventGenerator(stream)
 
 	requestHandler := func(w http.ResponseWriter, r *http.Request) {
