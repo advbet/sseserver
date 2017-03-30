@@ -10,9 +10,8 @@ import (
 	cache "github.com/patrickmn/go-cache"
 )
 
-type cachedStream struct {
+type CachedStream struct {
 	broker       brokerChan
-	lastID       interface{}
 	cfg          Config
 	responseStop chan struct{}
 	wg           sync.WaitGroup
@@ -38,10 +37,9 @@ var ErrCacheMiss = errors.New("missing events in cache")
 // this library is responsible for generating HTTP response to the client. It is
 // recommended to return 204 no content response to stop client from
 // reconnecting until he syncs event state manually.
-func NewCached(lastID interface{}, cfg Config, expiration, cleanup time.Duration) Stream {
-	s := &cachedStream{
+func NewCached(lastID interface{}, cfg Config, expiration, cleanup time.Duration) *CachedStream {
+	s := &CachedStream{
 		broker:       newBroker(),
-		lastID:       lastID,
 		cfg:          cfg,
 		responseStop: make(chan struct{}),
 		cache:        cache.New(expiration, cleanup),
@@ -55,47 +53,60 @@ func NewCached(lastID interface{}, cfg Config, expiration, cleanup time.Duration
 	return s
 }
 
-func (s *cachedStream) Publish(event *Event) {
-	s.cache.Set(fmt.Sprintf("%v", s.lastID), event, cache.DefaultExpiration)
-	s.lastID = event.ID
-	s.broker.publish(event)
+func (s *CachedStream) Publish(event *Event) {
+	s.PublishTopic("", event)
 }
 
-func (s *cachedStream) Subscribe(w http.ResponseWriter, lastClientID interface{}) error {
+func (s *CachedStream) PublishTopic(topic string, event *Event) {
+	s.broker.publish(topic, event, func(lastID interface{}) {
+		s.cache.Set(topicIDKey(topic, lastID), event, cache.DefaultExpiration)
+	})
+}
+
+func (s *CachedStream) Subscribe(w http.ResponseWriter, lastClientID interface{}) error {
+	return s.SubscribeTopic(w, "", lastClientID)
+}
+
+func (s *CachedStream) SubscribeTopic(w http.ResponseWriter, topic string, lastClientID interface{}) error {
 	source := make(chan *Event, s.cfg.QueueLength)
-	lastServerID := s.broker.subscribe(source)
+	lastServerID := s.broker.subscribe(topic, source)
 	defer s.broker.unsubscribe(source)
 
-	// if lastClientID is nil attach client to the stream without resync
-	if lastClientID == nil {
+	serverID := fmt.Sprintf("%v", lastServerID)
+	clientID := fmt.Sprintf("%v", lastClientID)
+	if lastClientID == nil || clientID == serverID {
+		// no resync needed
 		return Respond(w, source, &s.cfg, s.responseStop)
 	}
 
-	events := make([]Event, 0)
-	serverID := fmt.Sprintf("%v", lastServerID)
+	var events []Event
 	for {
-		clientID := fmt.Sprintf("%v", lastClientID)
-		if serverID == clientID {
-			break
-		}
-
-		eventIface, ok := s.cache.Get(clientID)
+		eventIface, ok := s.cache.Get(topicIDKey(topic, clientID))
 		if !ok {
 			return ErrCacheMiss
 		}
 
 		event := eventIface.(*Event)
 		events = append(events, *event)
-		lastClientID = event.ID
+
+		clientID = fmt.Sprintf("%v", event.ID)
+		if serverID == clientID {
+			break
+		}
 	}
 	return Respond(w, prependStream(events, source), &s.cfg, s.responseStop)
 }
 
-func (s *cachedStream) DropSubscribers() {
+func (s *CachedStream) DropSubscribers() {
 	close(s.responseStop)
 }
 
-func (s *cachedStream) Stop() {
+func (s *CachedStream) Stop() {
 	close(s.broker)
 	s.wg.Wait()
+}
+
+func topicIDKey(topic string, id interface{}) string {
+	strID := fmt.Sprintf("%v", id)
+	return fmt.Sprintf("%d:%s%d:%s", len(topic), topic, len(strID), strID)
 }

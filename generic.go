@@ -30,18 +30,26 @@ func NewGeneric(resync ResyncFn, lastID interface{}, cfg Config) Stream {
 	s.wg.Add(1)
 	go func() {
 		defer s.wg.Done()
-		s.broker.run(lastID)
+		s.broker.run(map[string]interface{}{"": lastID})
 	}()
 	return s
 }
 
 func (s *stream) Publish(event *Event) {
-	s.broker.publish(event)
+	s.PublishTopic("", event)
+}
+
+func (s *stream) PublishTopic(topic string, event *Event) {
+	s.broker.publish(topic, event, nil)
 }
 
 func (s *stream) Subscribe(w http.ResponseWriter, lastEventID interface{}) error {
+	return s.SubscribeTopic(w, "", lastEventID)
+}
+
+func (s *stream) SubscribeTopic(w http.ResponseWriter, topic string, lastEventID interface{}) error {
 	source := make(chan *Event, s.cfg.QueueLength)
-	toID := s.broker.subscribe(source)
+	toID := s.broker.subscribe(topic, source)
 	defer s.broker.unsubscribe(source)
 
 	// lastEventID will be nil if client connects for the first time

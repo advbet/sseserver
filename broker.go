@@ -4,10 +4,14 @@ type operation int
 
 // command is a message data type for controlling broker process.
 type command struct {
-	op       operation
+	op    operation
+	topic string
+
 	sink     chan<- *Event      // used for subscribe, unsubscribe
 	response chan<- interface{} // used for subscribe
-	event    *Event             // used for publish
+
+	event      *Event            // used for publish
+	prePublish func(interface{}) // used for publish
 }
 
 // brokerChan is an implementation of single pub-sub communications channel.
@@ -26,19 +30,25 @@ func newBroker() brokerChan {
 }
 
 // brokerPublish broadcasts given event via broker to all of the subscribers.
-func (b brokerChan) publish(event *Event) {
+//
+// prePublish will be called by broker before publishing event with last event
+// ID as an argument.
+func (b brokerChan) publish(topic string, event *Event, prePublish func(interface{})) {
 	b <- command{
-		op:    publish,
-		event: event,
+		op:         publish,
+		topic:      topic,
+		event:      event,
+		prePublish: prePublish,
 	}
 }
 
 // brokerSubscribe adds subscribes given channel to receive all events published
 // to this broker.
-func (b brokerChan) subscribe(events chan<- *Event) interface{} {
+func (b brokerChan) subscribe(topic string, events chan<- *Event) interface{} {
 	response := make(chan interface{}, 1)
 	b <- command{
 		op:       subscribe,
+		topic:    topic,
 		sink:     events,
 		response: response,
 	}
@@ -58,16 +68,19 @@ func (b brokerChan) unsubscribe(ch chan<- *Event) {
 
 // brokerRun handles event broadcasting and manages subscription lists. Each
 // started stream have this code running in a separate goroutine.
-func (b brokerChan) run(lastID interface{}) {
-	sinks := make(map[chan<- *Event]struct{})
+func (b brokerChan) run(lastIDs map[string]interface{}) {
+	sinks := make(map[chan<- *Event]string)
+	if lastIDs == nil {
+		lastIDs = make(map[string]interface{})
+	}
 
 	for cmd := range b {
 		switch cmd.op {
 		case subscribe:
-			sinks[cmd.sink] = struct{}{}
+			sinks[cmd.sink] = cmd.topic
 
 			// return last seen event ID to the subscriber
-			cmd.response <- lastID
+			cmd.response <- lastIDs[cmd.topic]
 			close(cmd.response)
 		case unsubscribe:
 			if _, ok := sinks[cmd.sink]; ok {
@@ -75,8 +88,14 @@ func (b brokerChan) run(lastID interface{}) {
 				delete(sinks, cmd.sink)
 			}
 		case publish:
-			lastID = cmd.event.ID
-			for ch := range sinks {
+			if cmd.prePublish != nil {
+				cmd.prePublish(lastIDs[cmd.topic])
+			}
+			lastIDs[cmd.topic] = cmd.event.ID
+			for ch, topic := range sinks {
+				if topic != cmd.topic {
+					continue
+				}
 				select {
 				case ch <- cmd.event:
 					// Success

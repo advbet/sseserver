@@ -1,13 +1,67 @@
 package sseserver
 
 import (
+	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
 
-func voidLookup(fromID, toID interface{}) (events []Event, ok bool) {
-	return nil, true
+func resyncGenerator(events []Event, ok bool) ResyncFn {
+	return func(fromID, toID interface{}) ([]Event, bool) {
+		return events, ok
+	}
+}
+
+func TestGenericDisconnect(t *testing.T) {
+	stream := NewGeneric(resyncGenerator(nil, false), nil, Config{
+		Reconnect:   0,
+		KeepAlive:   0,
+		Lifetime:    10 * time.Millisecond,
+		QueueLength: 32,
+	})
+	defer stream.Stop()
+
+	w := httptest.NewRecorder()
+	stream.Subscribe(w, nil)
+	assertReceivedEvents(t, w)
+}
+
+func TestGenericStaticEvents(t *testing.T) {
+	expected := []Event{{ID: 1}, {ID: 2}}
+	stream := NewGeneric(resyncGenerator(expected, false), nil, Config{
+		Reconnect:   0,
+		KeepAlive:   0,
+		Lifetime:    10 * time.Millisecond,
+		QueueLength: 32,
+	})
+	defer stream.Stop()
+
+	w := httptest.NewRecorder()
+	stream.Subscribe(w, nil)
+	assertReceivedEvents(t, w, expected...)
+}
+
+func TestGenericInitialLastEventID(t *testing.T) {
+	initialID := 15
+	var actualID interface{}
+	resync := func(fromID, toID interface{}) ([]Event, bool) {
+		actualID = toID
+		return nil, false
+	}
+	stream := NewGeneric(resync, initialID, Config{
+		Reconnect:   0,
+		KeepAlive:   0,
+		Lifetime:    10 * time.Millisecond,
+		QueueLength: 32,
+	})
+	defer stream.Stop()
+
+	w := httptest.NewRecorder()
+	stream.Subscribe(w, nil)
+	assertReceivedEvents(t, w)
+	assert.Equal(t, initialID, actualID)
 }
 
 func TestPrependStream(t *testing.T) {

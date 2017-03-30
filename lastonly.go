@@ -5,7 +5,7 @@ import (
 	"sync"
 )
 
-type lastOnlyStream struct {
+type LastOnlyStream struct {
 	broker       brokerChan
 	cfg          Config
 	responseStop chan struct{}
@@ -13,18 +13,18 @@ type lastOnlyStream struct {
 	wg sync.WaitGroup
 
 	sync.RWMutex
-	last *Event
+	last map[string]*Event
 }
 
 // NewLastOnly creates a new sse stream that resends only last seen event to all
 // newly connected clients. If client alredy have seen the lates event is is not
 // repeated.
-func NewLastOnly(cfg Config) Stream {
-	s := &lastOnlyStream{
+func NewLastOnly(cfg Config) *LastOnlyStream {
+	s := &LastOnlyStream{
 		broker:       newBroker(),
 		cfg:          cfg,
 		responseStop: make(chan struct{}),
-		last:         nil,
+		last:         make(map[string]*Event),
 	}
 	s.wg.Add(1)
 	go func() {
@@ -35,33 +35,43 @@ func NewLastOnly(cfg Config) Stream {
 	return s
 }
 
-func (s *lastOnlyStream) Publish(event *Event) {
-	s.Lock()
-	s.last = event
-	s.Unlock()
-
-	s.broker.publish(event)
+func (s *LastOnlyStream) Publish(event *Event) {
+	s.PublishTopic("", event)
 }
 
-func (s *lastOnlyStream) Subscribe(w http.ResponseWriter, lastEventID interface{}) error {
+func (s *LastOnlyStream) PublishTopic(topic string, event *Event) {
+	s.broker.publish(topic, event, func(lastID interface{}) {
+		s.Lock()
+		defer s.Unlock()
+		s.last[topic] = event
+	})
+}
+
+func (s *LastOnlyStream) Subscribe(w http.ResponseWriter, lastEventID interface{}) error {
+	return s.SubscribeTopic(w, "", lastEventID)
+}
+
+func (s *LastOnlyStream) SubscribeTopic(w http.ResponseWriter, topic string, lastEventID interface{}) error {
 	source := make(chan *Event, s.cfg.QueueLength)
+	s.broker.subscribe(topic, source)
+	defer s.broker.unsubscribe(source)
+
 	s.RLock()
-	if s.last != nil && s.last.ID != lastEventID {
-		source <- s.last
-	}
+	last := s.last[topic]
 	s.RUnlock()
 
-	s.broker.subscribe(source)
-	defer s.broker.unsubscribe(source)
+	if last != nil && last.ID != lastEventID {
+		return Respond(w, prependStream([]Event{*last}, source), &s.cfg, s.responseStop)
+	}
 
 	return Respond(w, source, &s.cfg, s.responseStop)
 }
 
-func (s *lastOnlyStream) DropSubscribers() {
+func (s *LastOnlyStream) DropSubscribers() {
 	close(s.responseStop)
 }
 
-func (s *lastOnlyStream) Stop() {
+func (s *LastOnlyStream) Stop() {
 	close(s.broker)
 	s.wg.Wait()
 }
