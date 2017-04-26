@@ -21,6 +21,7 @@ const (
 	subscribe operation = iota
 	unsubscribe
 	publish
+	broadcast
 )
 
 // newBroker creates a new instance of broker. It needs to be started with run
@@ -29,7 +30,7 @@ func newBroker() brokerChan {
 	return make(chan command)
 }
 
-// brokerPublish broadcasts given event via broker to all of the subscribers.
+// publish broadcasts given event via broker to all of the subscribers.
 //
 // prePublish will be called by broker before publishing event with last event
 // ID as an argument.
@@ -42,8 +43,17 @@ func (b brokerChan) publish(topic string, event *Event, prePublish func(interfac
 	}
 }
 
-// brokerSubscribe adds subscribes given channel to receive all events published
-// to this broker.
+// broadcast wil send given event to all active subsribers. Last event ID will
+// only be updated if event ID field is not set to nil.
+func (b brokerChan) broadcast(event *Event) {
+	b <- command{
+		op:    broadcast,
+		event: event,
+	}
+}
+
+// subscribe adds subscribes given channel to receive all events published to
+// this broker.
 func (b brokerChan) subscribe(topic string, events chan<- *Event) interface{} {
 	response := make(chan interface{}, 1)
 	b <- command{
@@ -66,12 +76,24 @@ func (b brokerChan) unsubscribe(ch chan<- *Event) {
 	}
 }
 
-// brokerRun handles event broadcasting and manages subscription lists. Each
-// started stream have this code running in a separate goroutine.
+// run handles event broadcasting and manages subscription lists. Each started
+// stream have this code running in a separate goroutine.
 func (b brokerChan) run(lastIDs map[string]interface{}) {
 	sinks := make(map[chan<- *Event]string)
 	if lastIDs == nil {
 		lastIDs = make(map[string]interface{})
+	}
+
+	emit := func(ch chan<- *Event, event *Event) {
+		select {
+		case ch <- event:
+			// Success
+		default:
+			// Client is too slow, close stream and
+			// wait for client reconnect
+			close(ch)
+			delete(sinks, ch)
+		}
 	}
 
 	for cmd := range b {
@@ -87,6 +109,13 @@ func (b brokerChan) run(lastIDs map[string]interface{}) {
 				close(cmd.sink)
 				delete(sinks, cmd.sink)
 			}
+		case broadcast:
+			for ch, topic := range sinks {
+				if cmd.event.ID != nil {
+					lastIDs[topic] = cmd.event.ID
+				}
+				emit(ch, cmd.event)
+			}
 		case publish:
 			if cmd.prePublish != nil {
 				cmd.prePublish(lastIDs[cmd.topic])
@@ -96,15 +125,7 @@ func (b brokerChan) run(lastIDs map[string]interface{}) {
 				if topic != cmd.topic {
 					continue
 				}
-				select {
-				case ch <- cmd.event:
-					// Success
-				default:
-					// Client is too slow, close stream and
-					// wait for client reconnect
-					close(ch)
-					delete(sinks, ch)
-				}
+				emit(ch, cmd.event)
 			}
 		}
 	}

@@ -63,6 +63,13 @@ func (s *CachedStream) PublishTopic(topic string, event *Event) {
 	})
 }
 
+func (s *CachedStream) PublishBroadcast(event *Event) {
+	// Cached SSE stream does not support tracking broadcasted events. This
+	// removes ID value from all broadcasted events.
+	event.ID = nil
+	s.broker.broadcast(event)
+}
+
 func (s *CachedStream) Subscribe(w http.ResponseWriter, lastClientID interface{}) error {
 	return s.SubscribeTopic(w, "", lastClientID)
 }

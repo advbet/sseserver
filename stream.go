@@ -53,6 +53,10 @@ type MultiStream interface {
 	// Publish on a stopped stream will cause panic.
 	PublishTopic(topic string, event *Event)
 
+	// PublishBroadcast emits given event to all connected subscribers (for
+	// all topics).
+	PublishBroadcast(event *Event)
+
 	// DropSubscribers removes all currently active stream subscribers and
 	// close all active HTTP responses. After call to this method all new
 	// subscribers would be closed immediately. Calling DropSubscribers more

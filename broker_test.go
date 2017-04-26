@@ -185,3 +185,36 @@ func TestBrokerUnsubscribe(t *testing.T) {
 	_, ok := <-client
 	assert.False(t, ok)
 }
+
+func TestBorkerBroadcast(t *testing.T) {
+	broker := newBroker()
+	defer close(broker)
+	go broker.run(nil)
+
+	// attach three clients to the broker
+	clients1 := make([]chan *Event, 3)
+	clients2 := make([]chan *Event, 3)
+	for i := 0; i < 3; i++ {
+		clients1[i] = make(chan *Event, 10)
+		broker.subscribe("topic1", clients1[i])
+
+		clients2[i] = make(chan *Event, 10)
+		broker.subscribe("topic2", clients2[i])
+	}
+
+	// emit single event
+	event := &Event{ID: 15, Event: "test1", Data: "ok1"}
+	broker.broadcast(event)
+
+	// check if all clients received it
+	for _, client := range clients1 {
+		e, ok := <-client
+		assert.True(t, ok)
+		assert.Equal(t, event, e)
+	}
+	for _, client := range clients2 {
+		e, ok := <-client
+		assert.True(t, ok)
+		assert.Equal(t, event, e)
+	}
+}
