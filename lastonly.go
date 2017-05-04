@@ -47,6 +47,15 @@ func (s *LastOnlyStream) PublishTopic(topic string, event *Event) {
 	})
 }
 
+// PublishBroadcast for LastOnlyStream does not cache a broadcasted event
+// and thus does not permit sending an event with ID value.
+func (s *LastOnlyStream) PublishBroadcast(event *Event) {
+	// LastOnly SSE stream does not support tracking broadcasted events. This
+	// removes ID value from all broadcasted events.
+	event.ID = nil
+	s.broker.broadcast(event)
+}
+
 func (s *LastOnlyStream) Subscribe(w http.ResponseWriter, lastEventID interface{}) error {
 	return s.SubscribeTopic(w, "", lastEventID)
 }
