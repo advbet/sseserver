@@ -32,8 +32,11 @@ var ErrCacheMiss = errors.New("missing events in cache")
 // expiration time in local cache and clients are automatically resynced on
 // reconnect.
 //
-// Passing nil as last event ID for Subscribe would connect client without
-// resync. Call to subscribe might return ErrCacheMiss, in this case user of
+// Passing nil or empty string as last event ID for Subscribe() would connect
+// client without resync.
+//
+// Call to Subscribe() might return ErrCacheMiss if client requests to resync
+// from an event not found in the cache. If ErrCacheMiss is returned user of
 // this library is responsible for generating HTTP response to the client. It is
 // recommended to return 204 no content response to stop client from
 // reconnecting until he syncs event state manually.
@@ -47,7 +50,9 @@ func NewCached(lastID interface{}, cfg Config, expiration, cleanup time.Duration
 	s.wg.Add(1)
 	go func() {
 		defer s.wg.Done()
-		s.broker.run(nil)
+		s.broker.run(map[string]interface{}{
+			"": lastID,
+		})
 	}()
 
 	return s
@@ -81,7 +86,7 @@ func (s *CachedStream) SubscribeTopic(w http.ResponseWriter, topic string, lastC
 
 	serverID := fmt.Sprintf("%v", lastServerID)
 	clientID := fmt.Sprintf("%v", lastClientID)
-	if lastClientID == nil || clientID == serverID {
+	if lastClientID == nil || clientID == "" || clientID == serverID {
 		// no resync needed
 		return Respond(w, source, &s.cfg, s.responseStop)
 	}
