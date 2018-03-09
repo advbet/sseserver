@@ -89,6 +89,9 @@ type MultiStream interface {
 // client reconnects. Users of this package must provide an implementation of
 // this function when creating new streams.
 //
+// For multi-streams topic argument will be set to sub-stream name, for
+// single-streams it will be empty string.
+//
 // This function takes two event ID values as an argument and must return all
 // events having IDs in interval (fromID, toID]. Note that event with ID equal
 // to fromID SHOULD NOT be included, but event with toID SHOULD be included.
@@ -107,4 +110,4 @@ type MultiStream interface {
 //
 // Correct implementation of this function is essential for proper client
 // resync and vital to whole SSE functionality.
-type ResyncFn func(fromID, toID interface{}) (events []Event, ok bool)
+type ResyncFn func(topic string, fromID, toID interface{}) (events []Event, ok bool)

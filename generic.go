@@ -5,7 +5,9 @@ import (
 	"sync"
 )
 
-type stream struct {
+// GenericStream is the most generic SSE stream implementation where resync
+// logic is supplied by the user of this package.
+type GenericStream struct {
 	broker       brokerChan
 	resync       ResyncFn
 	cfg          Config
@@ -20,8 +22,8 @@ type stream struct {
 // Argument lastID is used set last event ID that was published before
 // application was started, this value is passed to the resync function and
 // later replaced by the events published with stream.Publish method.
-func NewGeneric(resync ResyncFn, lastID interface{}, cfg Config) Stream {
-	s := &stream{
+func NewGeneric(resync ResyncFn, lastID interface{}, cfg Config) *GenericStream {
+	s := &GenericStream{
 		broker:       newBroker(),
 		resync:       resync,
 		cfg:          cfg,
@@ -35,37 +37,42 @@ func NewGeneric(resync ResyncFn, lastID interface{}, cfg Config) Stream {
 	return s
 }
 
-func (s *stream) Publish(event *Event) {
+func (s *GenericStream) Publish(event *Event) {
 	s.PublishTopic("", event)
 }
 
-func (s *stream) PublishTopic(topic string, event *Event) {
+func (s *GenericStream) PublishTopic(topic string, event *Event) {
 	s.broker.publish(topic, event, nil)
 }
 
-func (s *stream) Subscribe(w http.ResponseWriter, lastEventID interface{}) error {
+func (s *GenericStream) PublishBroadcast(event *Event) {
+	event.ID = nil
+	s.broker.broadcast(event)
+}
+
+func (s *GenericStream) Subscribe(w http.ResponseWriter, lastEventID interface{}) error {
 	return s.SubscribeTopic(w, "", lastEventID)
 }
 
-func (s *stream) SubscribeTopic(w http.ResponseWriter, topic string, lastEventID interface{}) error {
+func (s *GenericStream) SubscribeTopic(w http.ResponseWriter, topic string, lastEventID interface{}) error {
 	source := make(chan *Event, s.cfg.QueueLength)
 	toID := s.broker.subscribe(topic, source)
 	defer s.broker.unsubscribe(source)
 
 	// lastEventID will be nil if client connects for the first time
 	// serverID will be nil if server did not send any events yet
-	events, ok := s.resync(lastEventID, toID)
+	events, ok := s.resync(topic, lastEventID, toID)
 	if !ok {
 		return Respond(w, prependStream(events, nil), &s.cfg, s.responseStop)
 	}
 	return Respond(w, prependStream(events, source), &s.cfg, s.responseStop)
 }
 
-func (s *stream) DropSubscribers() {
+func (s *GenericStream) DropSubscribers() {
 	close(s.responseStop)
 }
 
-func (s *stream) Stop() {
+func (s *GenericStream) Stop() {
 	close(s.broker)
 	s.wg.Wait()
 }

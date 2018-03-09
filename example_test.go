@@ -9,18 +9,19 @@ import (
 	"bitbucket.org/advbet/sseserver"
 )
 
-func newEvent(id int) *sseserver.Event {
+func newEvent(topic string, id int) *sseserver.Event {
 	return &sseserver.Event{
 		ID:    id,
 		Event: "counter",
 		Data: map[string]interface{}{
-			"msg": "ticks since start",
-			"val": id,
+			"msg":   "ticks since start",
+			"topic": topic,
+			"val":   id,
 		},
 	}
 }
 
-func lookupEvents(fromI interface{}, toI interface{}) ([]sseserver.Event, bool) {
+func lookupEvents(topic string, fromI interface{}, toI interface{}) ([]sseserver.Event, bool) {
 	if fromI == nil {
 		// New client
 		// no resync, continue sending live events
@@ -37,17 +38,18 @@ func lookupEvents(fromI interface{}, toI interface{}) ([]sseserver.Event, bool) 
 	}
 
 	events := []sseserver.Event{}
-	if to-from > 10 {
+	switch {
+	case to-from > 10:
 		// do not resync more than 10 events at a time
 		for i := from + 1; i <= from+10; i++ {
-			events = append(events, *newEvent(i))
+			events = append(events, *newEvent(topic, i))
 		}
 		// send first 10 missing events, disconnect client to come back
 		// for more
 		return events, false
-	} else {
+	default:
 		for i := from + 1; i <= to; i++ {
-			events = append(events, *newEvent(i))
+			events = append(events, *newEvent(topic, i))
 		}
 		// send missing events, continue sending live events
 		return events, true
@@ -60,7 +62,7 @@ func eventGenerator(stream sseserver.Stream) {
 
 	for range c {
 		i++
-		stream.Publish(newEvent(i))
+		stream.Publish(newEvent("", i))
 	}
 }
 

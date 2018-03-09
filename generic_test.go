@@ -9,7 +9,7 @@ import (
 )
 
 func resyncGenerator(events []Event, ok bool) ResyncFn {
-	return func(fromID, toID interface{}) ([]Event, bool) {
+	return func(topic string, fromID, toID interface{}) ([]Event, bool) {
 		return events, ok
 	}
 }
@@ -46,7 +46,7 @@ func TestGenericStaticEvents(t *testing.T) {
 func TestGenericInitialLastEventID(t *testing.T) {
 	initialID := 15
 	var actualID interface{}
-	resync := func(fromID, toID interface{}) ([]Event, bool) {
+	resync := func(topcic string, fromID, toID interface{}) ([]Event, bool) {
 		actualID = toID
 		return nil, false
 	}
@@ -62,6 +62,27 @@ func TestGenericInitialLastEventID(t *testing.T) {
 	stream.Subscribe(w, nil)
 	assertReceivedEvents(t, w)
 	assert.Equal(t, initialID, actualID)
+}
+
+func TestGenericResyncTopic(t *testing.T) {
+	const topic = "some-topic"
+	var receivedTopic string
+	resync := func(topcic string, fromID, toID interface{}) ([]Event, bool) {
+		receivedTopic = topic
+		return nil, false
+	}
+	stream := NewGeneric(resync, nil, Config{
+		Reconnect:   0,
+		KeepAlive:   0,
+		Lifetime:    10 * time.Millisecond,
+		QueueLength: 32,
+	})
+	defer stream.Stop()
+
+	w := httptest.NewRecorder()
+	stream.SubscribeTopic(w, topic, nil)
+	assertReceivedEvents(t, w)
+	assert.Equal(t, topic, receivedTopic, "resync function received another topic")
 }
 
 func TestPrependStream(t *testing.T) {
