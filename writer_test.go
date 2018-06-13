@@ -57,7 +57,7 @@ func TestRespondContentType(t *testing.T) {
 
 	w := recordResponse(t, source, &Config{}, nil)
 	contentType := w.HeaderMap.Get("Content-Type")
-	assert.Equal(t, "text/event-stream", contentType, "Content-Type header is missing or invalid")
+	assert.Equal(t, "text/event-stream; charset=utf-8", contentType, "Content-Type header is missing or invalid")
 }
 
 func TestRespondTimeout(t *testing.T) {

@@ -114,7 +114,7 @@ func Respond(w http.ResponseWriter, source <-chan *Event, cfg *Config, stop <-ch
 		keepaliveChan = ticker.C
 	}
 
-	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Content-Type", "text/event-stream; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-cache")
 	// Instruct nginx to disable buffering
 	w.Header().Set("X-Accel-Buffering", "no")
