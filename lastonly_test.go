@@ -6,6 +6,9 @@ import (
 	"time"
 )
 
+var _ Stream = &LastOnlyStream{}
+var _ MultiStream = &LastOnlyStream{}
+
 func TestLastOnlyResync(t *testing.T) {
 	stream := NewLastOnly(Config{
 		Reconnect:   0,

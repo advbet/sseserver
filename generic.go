@@ -51,10 +51,18 @@ func (s *GenericStream) PublishBroadcast(event *Event) {
 }
 
 func (s *GenericStream) Subscribe(w http.ResponseWriter, lastEventID interface{}) error {
-	return s.SubscribeTopic(w, "", lastEventID)
+	return s.SubscribeTopicFiltered(w, "", lastEventID, nil)
+}
+
+func (s *GenericStream) SubscribeFiltered(w http.ResponseWriter, lastEventID interface{}, f FilterFn) error {
+	return s.SubscribeTopicFiltered(w, "", lastEventID, f)
 }
 
 func (s *GenericStream) SubscribeTopic(w http.ResponseWriter, topic string, lastEventID interface{}) error {
+	return s.SubscribeTopicFiltered(w, topic, lastEventID, nil)
+}
+
+func (s *GenericStream) SubscribeTopicFiltered(w http.ResponseWriter, topic string, lastEventID interface{}, f FilterFn) error {
 	source := make(chan *Event, s.cfg.QueueLength)
 	toID := s.broker.subscribe(topic, source)
 	defer s.broker.unsubscribe(source)
@@ -63,9 +71,9 @@ func (s *GenericStream) SubscribeTopic(w http.ResponseWriter, topic string, last
 	// serverID will be nil if server did not send any events yet
 	events, ok := s.resync(topic, lastEventID, toID)
 	if !ok {
-		return Respond(w, prependStream(events, nil), &s.cfg, s.responseStop)
+		return Respond(w, applyFilter(prependStream(events, nil), f), &s.cfg, s.responseStop)
 	}
-	return Respond(w, prependStream(events, source), &s.cfg, s.responseStop)
+	return Respond(w, applyFilter(prependStream(events, source), f), &s.cfg, s.responseStop)
 }
 
 func (s *GenericStream) DropSubscribers() {

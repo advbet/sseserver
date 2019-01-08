@@ -57,10 +57,18 @@ func (s *LastOnlyStream) PublishBroadcast(event *Event) {
 }
 
 func (s *LastOnlyStream) Subscribe(w http.ResponseWriter, lastEventID interface{}) error {
-	return s.SubscribeTopic(w, "", lastEventID)
+	return s.SubscribeTopicFiltered(w, "", lastEventID, nil)
+}
+
+func (s *LastOnlyStream) SubscribeFiltered(w http.ResponseWriter, lastEventID interface{}, f FilterFn) error {
+	return s.SubscribeTopicFiltered(w, "", lastEventID, f)
 }
 
 func (s *LastOnlyStream) SubscribeTopic(w http.ResponseWriter, topic string, lastEventID interface{}) error {
+	return s.SubscribeTopicFiltered(w, topic, lastEventID, nil)
+}
+
+func (s *LastOnlyStream) SubscribeTopicFiltered(w http.ResponseWriter, topic string, lastEventID interface{}, f FilterFn) error {
 	source := make(chan *Event, s.cfg.QueueLength)
 	s.broker.subscribe(topic, source)
 	defer s.broker.unsubscribe(source)
@@ -70,10 +78,10 @@ func (s *LastOnlyStream) SubscribeTopic(w http.ResponseWriter, topic string, las
 	s.RUnlock()
 
 	if last != nil && last.ID != lastEventID {
-		return Respond(w, prependStream([]Event{*last}, source), &s.cfg, s.responseStop)
+		return Respond(w, applyFilter(prependStream([]Event{*last}, source), f), &s.cfg, s.responseStop)
 	}
 
-	return Respond(w, source, &s.cfg, s.responseStop)
+	return Respond(w, applyFilter(source, f), &s.cfg, s.responseStop)
 }
 
 func (s *LastOnlyStream) DropSubscribers() {

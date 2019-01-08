@@ -8,6 +8,9 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+var _ Stream = &GenericStream{}
+var _ MultiStream = &GenericStream{}
+
 func resyncGenerator(events []Event, ok bool) ResyncFn {
 	return func(topic string, fromID, toID interface{}) ([]Event, bool) {
 		return events, ok

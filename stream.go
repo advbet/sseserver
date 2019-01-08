@@ -39,6 +39,11 @@ type Stream interface {
 	//
 	// Subscribe on a stopped stream will cause panic.
 	Subscribe(w http.ResponseWriter, lastEventID interface{}) error
+
+	// SubscribeFiltered is similar to Subscribe but each event before being
+	// sent to client will be passed to given filtering function. Events
+	// returned by the filtering function will be used instead.
+	SubscribeFiltered(w http.ResponseWriter, lastEventID interface{}, f FilterFn) error
 }
 
 // MutiStream is an abstraction of multiple SSE streams. Single instance of
@@ -83,6 +88,11 @@ type MultiStream interface {
 	//
 	// Subscribe on a stopped stream will cause panic.
 	SubscribeTopic(w http.ResponseWriter, topic string, lastEventID interface{}) error
+
+	// SubscribeFiltered is similar to Subscribe but each event before being
+	// sent to client will be passed to given filtering function. Events
+	// returned by the filtering function will be used instead.
+	SubscribeTopicFiltered(w http.ResponseWriter, topic string, lastEventID interface{}, f FilterFn) error
 }
 
 // ResyncFn is a definition of function used to lookup events missed by
@@ -111,3 +121,14 @@ type MultiStream interface {
 // Correct implementation of this function is essential for proper client
 // resync and vital to whole SSE functionality.
 type ResyncFn func(topic string, fromID, toID interface{}) (events []Event, ok bool)
+
+// FilterFn is a callback function used to mutate event stream for individual
+// subscriptions. This function will be invoked for each event before sending it
+// to the client, result of this function will be sent instead of original
+// event. If this function returns `nil` event will be omitted.
+//
+// Original event passed to this function should NOT be mutated. Filtering
+// function with the same event data will be called in separate per-subscriber
+// go-routines. Event mutation will cause guaranteed data race condition. If
+// event needs to be altered fresh copy needs to be returned.
+type FilterFn func(e *Event) *Event

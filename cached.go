@@ -76,10 +76,18 @@ func (s *CachedStream) PublishBroadcast(event *Event) {
 }
 
 func (s *CachedStream) Subscribe(w http.ResponseWriter, lastClientID interface{}) error {
-	return s.SubscribeTopic(w, "", lastClientID)
+	return s.SubscribeTopicFiltered(w, "", lastClientID, nil)
+}
+
+func (s *CachedStream) SubscribeFiltered(w http.ResponseWriter, lastClientID interface{}, f FilterFn) error {
+	return s.SubscribeTopicFiltered(w, "", lastClientID, f)
 }
 
 func (s *CachedStream) SubscribeTopic(w http.ResponseWriter, topic string, lastClientID interface{}) error {
+	return s.SubscribeTopicFiltered(w, topic, lastClientID, nil)
+}
+
+func (s *CachedStream) SubscribeTopicFiltered(w http.ResponseWriter, topic string, lastClientID interface{}, f FilterFn) error {
 	source := make(chan *Event, s.cfg.QueueLength)
 	lastServerID := s.broker.subscribe(topic, source)
 	defer s.broker.unsubscribe(source)
@@ -88,7 +96,7 @@ func (s *CachedStream) SubscribeTopic(w http.ResponseWriter, topic string, lastC
 	clientID := fmt.Sprintf("%v", lastClientID)
 	if lastClientID == nil || clientID == "" || clientID == serverID {
 		// no resync needed
-		return Respond(w, source, &s.cfg, s.responseStop)
+		return Respond(w, applyFilter(source, f), &s.cfg, s.responseStop)
 	}
 
 	var events []Event
@@ -106,7 +114,7 @@ func (s *CachedStream) SubscribeTopic(w http.ResponseWriter, topic string, lastC
 			break
 		}
 	}
-	return Respond(w, prependStream(events, source), &s.cfg, s.responseStop)
+	return Respond(w, applyFilter(prependStream(events, source), f), &s.cfg, s.responseStop)
 }
 
 func (s *CachedStream) DropSubscribers() {

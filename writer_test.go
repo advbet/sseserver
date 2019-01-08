@@ -138,3 +138,56 @@ func TestRespondCloseNotify(t *testing.T) {
 
 	assert.WithinDuration(t, start, end, closeTimeout*2)
 }
+
+func TestApplyFilter(t *testing.T) {
+	evenFilterGen := func() FilterFn {
+		var n int
+		return func(e *Event) *Event {
+			n += 1
+			if n%2 == 1 {
+				return e
+			}
+			return nil
+		}
+	}
+
+	tests := []struct {
+		msg    string
+		filter FilterFn
+		input  []*Event
+		output []*Event
+	}{
+		{
+			msg:    "nil filter",
+			input:  []*Event{{ID: "1"}, {ID: "2"}},
+			output: []*Event{{ID: "1"}, {ID: "2"}},
+		},
+		{
+			msg:    "identity filter",
+			filter: func(e *Event) *Event { return e },
+			input:  []*Event{{ID: "1"}, {ID: "2"}},
+			output: []*Event{{ID: "1"}, {ID: "2"}},
+		},
+		{
+			msg:    "even only filter",
+			filter: evenFilterGen(),
+			input:  []*Event{{ID: "a"}, {ID: "b"}, {ID: "c"}, {ID: "d"}},
+			output: []*Event{{ID: "a"}, {ID: "c"}},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.msg, func(t *testing.T) {
+			in := make(chan *Event, len(test.input))
+			for _, e := range test.input {
+				in <- e
+			}
+			close(in)
+			output := make([]*Event, 0)
+			for e := range applyFilter(in, test.filter) {
+				output = append(output, e)
+			}
+			assert.Equal(t, test.output, output)
+		})
+	}
+}

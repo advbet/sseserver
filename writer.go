@@ -160,6 +160,9 @@ loop:
 // Write dumps single event in SSE wire format to a http.ResponseWriter.
 // Flushing should be performed by the caller.
 func write(w io.Writer, e *Event) error {
+	if e == nil {
+		return nil
+	}
 	if e.ID != nil {
 		if _, err := fmt.Fprintf(w, "id: %v\n", e.ID); err != nil {
 			return err
@@ -186,4 +189,22 @@ func write(w io.Writer, e *Event) error {
 		return err
 	}
 	return nil
+}
+
+func applyFilter(input <-chan *Event, f FilterFn) <-chan *Event {
+	if f == nil {
+		return input
+	}
+
+	output := make(chan *Event)
+	go func() {
+		defer close(output)
+		for e := range input {
+			event := f(e)
+			if event != nil {
+				output <- event
+			}
+		}
+	}()
+	return output
 }
