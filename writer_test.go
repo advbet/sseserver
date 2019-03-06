@@ -184,7 +184,7 @@ func TestApplyFilter(t *testing.T) {
 			}
 			close(in)
 			output := make([]*Event, 0)
-			for e := range applyFilter(in, test.filter) {
+			for e := range applyChanFilter(in, test.filter) {
 				output = append(output, e)
 			}
 			assert.Equal(t, test.output, output)

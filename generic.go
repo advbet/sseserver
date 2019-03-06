@@ -67,13 +67,30 @@ func (s *GenericStream) SubscribeTopicFiltered(w http.ResponseWriter, topic stri
 	toID := s.broker.subscribe(topic, source)
 	defer s.broker.unsubscribe(source)
 
+	events := make([]Event, 0)
 	// lastEventID will be nil if client connects for the first time
 	// serverID will be nil if server did not send any events yet
-	events, ok := s.resync(topic, lastEventID, toID)
-	if !ok {
-		return Respond(w, applyFilter(prependStream(events, nil), f), &s.cfg, s.responseStop)
+	for len(events) <= s.cfg.ResyncEventsThreshold {
+		list, err := s.resync(topic, lastEventID, toID)
+		if err != nil {
+			if len(events) > 0 {
+				return Respond(w, prependStream(events, nil), &s.cfg, s.responseStop)
+			}
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return nil
+		}
+		if len(list) == 0 {
+			return Respond(w, prependStream(events, source), &s.cfg, s.responseStop)
+		}
+		switch f {
+		case nil:
+			events = append(events, list...)
+		default:
+			events = append(events, applySliceFilter(list, f)...)
+		}
+		lastEventID = list[len(list)-1].ID
 	}
-	return Respond(w, applyFilter(prependStream(events, source), f), &s.cfg, s.responseStop)
+	return Respond(w, prependStream(events, nil), &s.cfg, s.responseStop)
 }
 
 func (s *GenericStream) DropSubscribers() {

@@ -1,6 +1,8 @@
 package sseserver
 
 import (
+	"errors"
+	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
@@ -11,33 +13,35 @@ import (
 var _ Stream = &GenericStream{}
 var _ MultiStream = &GenericStream{}
 
-func resyncGenerator(events []Event, ok bool) ResyncFn {
-	return func(topic string, fromID, toID interface{}) ([]Event, bool) {
-		return events, ok
+func resyncGenerator(events []Event, err error) ResyncFn {
+	return func(topic string, fromID, toID interface{}) ([]Event, error) {
+		return events, err
 	}
 }
 
 func TestGenericDisconnect(t *testing.T) {
-	stream := NewGeneric(resyncGenerator(nil, false), nil, Config{
-		Reconnect:   0,
-		KeepAlive:   0,
-		Lifetime:    10 * time.Millisecond,
-		QueueLength: 32,
+	stream := NewGeneric(resyncGenerator(nil, errors.New("error")), nil, Config{
+		Reconnect:             0,
+		KeepAlive:             0,
+		Lifetime:              10 * time.Millisecond,
+		QueueLength:           32,
+		ResyncEventsThreshold: 10000,
 	})
 	defer stream.Stop()
 
 	w := httptest.NewRecorder()
 	stream.Subscribe(w, nil)
-	assertReceivedEvents(t, w)
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
 }
 
-func TestGenericStaticEvents(t *testing.T) {
+func TestGenericResyncThreshold(t *testing.T) {
 	expected := []Event{{ID: 1}, {ID: 2}}
-	stream := NewGeneric(resyncGenerator(expected, false), nil, Config{
-		Reconnect:   0,
-		KeepAlive:   0,
-		Lifetime:    10 * time.Millisecond,
-		QueueLength: 32,
+	stream := NewGeneric(resyncGenerator(expected, nil), nil, Config{
+		Reconnect:             0,
+		KeepAlive:             0,
+		Lifetime:              10 * time.Millisecond,
+		QueueLength:           32,
+		ResyncEventsThreshold: 1,
 	})
 	defer stream.Stop()
 
@@ -46,18 +50,49 @@ func TestGenericStaticEvents(t *testing.T) {
 	assertReceivedEvents(t, w, expected...)
 }
 
+func TestGenericResyncBeforeDisconnect(t *testing.T) {
+	expected := []Event{{ID: 1}, {ID: 2}}
+	var synced bool
+	resync := func(topic string, fromID, toID interface{}) ([]Event, error) {
+		if !synced {
+			synced = true
+			return expected, nil
+		}
+		return nil, errors.New("synced")
+	}
+	stream := NewGeneric(resync, nil, Config{
+		Reconnect:             0,
+		KeepAlive:             0,
+		Lifetime:              10 * time.Millisecond,
+		QueueLength:           32,
+		ResyncEventsThreshold: 5,
+	})
+	defer stream.Stop()
+
+	// Get resynced events
+	w1 := httptest.NewRecorder()
+	stream.Subscribe(w1, nil)
+	assertReceivedEvents(t, w1, expected...)
+
+	// Client reconnects after resync
+	w2 := httptest.NewRecorder()
+	stream.Subscribe(w2, 2)
+	assert.Equal(t, http.StatusInternalServerError, w2.Code)
+}
+
 func TestGenericInitialLastEventID(t *testing.T) {
 	initialID := 15
 	var actualID interface{}
-	resync := func(topcic string, fromID, toID interface{}) ([]Event, bool) {
+	resync := func(topcic string, fromID, toID interface{}) ([]Event, error) {
 		actualID = toID
-		return nil, false
+		return nil, nil
 	}
 	stream := NewGeneric(resync, initialID, Config{
-		Reconnect:   0,
-		KeepAlive:   0,
-		Lifetime:    10 * time.Millisecond,
-		QueueLength: 32,
+		Reconnect:             0,
+		KeepAlive:             0,
+		Lifetime:              10 * time.Millisecond,
+		QueueLength:           32,
+		ResyncEventsThreshold: 10000,
 	})
 	defer stream.Stop()
 
@@ -70,20 +105,21 @@ func TestGenericInitialLastEventID(t *testing.T) {
 func TestGenericResyncTopic(t *testing.T) {
 	const topic = "some-topic"
 	var receivedTopic string
-	resync := func(topcic string, fromID, toID interface{}) ([]Event, bool) {
+	resync := func(topic string, fromID, toID interface{}) ([]Event, error) {
 		receivedTopic = topic
-		return nil, false
+		return nil, nil
 	}
 	stream := NewGeneric(resync, nil, Config{
-		Reconnect:   0,
-		KeepAlive:   0,
-		Lifetime:    10 * time.Millisecond,
-		QueueLength: 32,
+		Reconnect:             0,
+		KeepAlive:             0,
+		Lifetime:              10 * time.Millisecond,
+		QueueLength:           32,
+		ResyncEventsThreshold: 10000,
 	})
 	defer stream.Stop()
 
 	w := httptest.NewRecorder()
-	stream.SubscribeTopic(w, topic, nil)
+	stream.SubscribeTopic(w, topic, 0)
 	assertReceivedEvents(t, w)
 	assert.Equal(t, topic, receivedTopic, "resync function received another topic")
 }

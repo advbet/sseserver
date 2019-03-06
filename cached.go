@@ -96,7 +96,7 @@ func (s *CachedStream) SubscribeTopicFiltered(w http.ResponseWriter, topic strin
 	clientID := fmt.Sprintf("%v", lastClientID)
 	if lastClientID == nil || clientID == "" || clientID == serverID {
 		// no resync needed
-		return Respond(w, applyFilter(source, f), &s.cfg, s.responseStop)
+		return Respond(w, applyChanFilter(source, f), &s.cfg, s.responseStop)
 	}
 
 	var events []Event
@@ -114,7 +114,7 @@ func (s *CachedStream) SubscribeTopicFiltered(w http.ResponseWriter, topic strin
 			break
 		}
 	}
-	return Respond(w, applyFilter(prependStream(events, source), f), &s.cfg, s.responseStop)
+	return Respond(w, applyChanFilter(prependStream(events, source), f), &s.cfg, s.responseStop)
 }
 
 func (s *CachedStream) DropSubscribers() {

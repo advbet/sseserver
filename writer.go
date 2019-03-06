@@ -35,6 +35,12 @@ type Config struct {
 	// to the client before connection is closed. Note queue length of 0
 	// should be never used, recommended size is 32.
 	QueueLength int
+
+	// ResyncEventsThreshold is the threshold number of events that can be
+	// returned to the client after resync with a last seen event id. After
+	// the threshold is crossed no more attempts at a resync will be performed
+	// and the client will be disconnected.
+	ResyncEventsThreshold int
 }
 
 // Event holds data for single event in SSE stream.
@@ -46,10 +52,11 @@ type Event struct {
 
 // DefaultConfig is a recommended SSE configuration.
 var DefaultConfig = Config{
-	Reconnect:   500 * time.Millisecond,
-	KeepAlive:   30 * time.Second,
-	Lifetime:    5 * time.Minute,
-	QueueLength: 32,
+	Reconnect:             500 * time.Millisecond,
+	KeepAlive:             30 * time.Second,
+	Lifetime:              5 * time.Minute,
+	QueueLength:           32,
+	ResyncEventsThreshold: 1000,
 }
 
 var errFlusherIface = errors.New("http.ResponseWriter does not implement http.Flusher interface")
@@ -191,7 +198,7 @@ func write(w io.Writer, e *Event) error {
 	return nil
 }
 
-func applyFilter(input <-chan *Event, f FilterFn) <-chan *Event {
+func applyChanFilter(input <-chan *Event, f FilterFn) <-chan *Event {
 	if f == nil {
 		return input
 	}
@@ -207,4 +214,15 @@ func applyFilter(input <-chan *Event, f FilterFn) <-chan *Event {
 		}
 	}()
 	return output
+}
+
+func applySliceFilter(events []Event, f FilterFn) []Event {
+	result := make([]Event, 0)
+	for _, event := range events {
+		if e := f(&event); e != nil {
+			result = append(result, *e)
+		}
+	}
+
+	return result
 }

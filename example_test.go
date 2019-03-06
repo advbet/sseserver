@@ -21,11 +21,11 @@ func newEvent(topic string, id int) *sseserver.Event {
 	}
 }
 
-func lookupEvents(topic string, fromI interface{}, toI interface{}) ([]sseserver.Event, bool) {
+func lookupEvents(topic string, fromI interface{}, toI interface{}) ([]sseserver.Event, error) {
 	if fromI == nil {
 		// New client
 		// no resync, continue sending live events
-		return nil, true
+		return nil, nil
 	}
 
 	from := fromI.(int)
@@ -34,7 +34,7 @@ func lookupEvents(topic string, fromI interface{}, toI interface{}) ([]sseserver
 	if from >= to {
 		// Client is up to date
 		// no resync, continue sending live events
-		return nil, true
+		return nil, nil
 	}
 
 	events := []sseserver.Event{}
@@ -44,15 +44,14 @@ func lookupEvents(topic string, fromI interface{}, toI interface{}) ([]sseserver
 		for i := from + 1; i <= from+10; i++ {
 			events = append(events, *newEvent(topic, i))
 		}
-		// send first 10 missing events, disconnect client to come back
-		// for more
-		return events, false
+		// send first 10 missing events
+		return events, nil
 	default:
 		for i := from + 1; i <= to; i++ {
 			events = append(events, *newEvent(topic, i))
 		}
 		// send missing events, continue sending live events
-		return events, true
+		return events, nil
 	}
 }
 

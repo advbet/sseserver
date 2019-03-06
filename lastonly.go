@@ -78,10 +78,10 @@ func (s *LastOnlyStream) SubscribeTopicFiltered(w http.ResponseWriter, topic str
 	s.RUnlock()
 
 	if last != nil && last.ID != lastEventID {
-		return Respond(w, applyFilter(prependStream([]Event{*last}, source), f), &s.cfg, s.responseStop)
+		return Respond(w, applyChanFilter(prependStream([]Event{*last}, source), f), &s.cfg, s.responseStop)
 	}
 
-	return Respond(w, applyFilter(source, f), &s.cfg, s.responseStop)
+	return Respond(w, applyChanFilter(source, f), &s.cfg, s.responseStop)
 }
 
 func (s *LastOnlyStream) DropSubscribers() {

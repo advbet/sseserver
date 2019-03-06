@@ -102,25 +102,23 @@ type MultiStream interface {
 // For multi-streams topic argument will be set to sub-stream name, for
 // single-streams it will be empty string.
 //
-// This function takes two event ID values as an argument and must return all
-// events having IDs in interval (fromID, toID]. Note that event with ID equal
-// to fromID SHOULD NOT be included, but event with toID SHOULD be included.
-// Argument fromID can be nil if nil was passed to stream.Subscribe as last
-// event ID, it usually means client have connected to the SSE stream for the
-// first time. Argument toID can also be nil if nil was passed as lastID to
-// New() function and client have connected to the SSE stream before any events
-// were published using stream.Publish.
+// This function takes two event ID values as an argument and should return all
+// events having IDs in interval (fromID, toID]. ResyncFn will be called
+// repeatedly until an empty events slice is returned (no more missing events)
+// or ResyncEventsThreshold is reached. Note that event with ID equal to fromID
+// SHOULD NOT be included, but event with toID SHOULD be included. Argument
+// fromID can be nil if nil was passed to stream.Subscribe as last event ID, it
+// usually means client has connected to the SSE stream for the first time.
+// Argument toID can also be nil if nil was passed as lastID to New() function
+// and client have connected to the SSE stream before any events were published
+// using stream.Publish.
 //
-// ResyncFn should return all events in a given range in a slice. Second
-// return variable ok should be set to true if result contains all the requested
-// events, false otherwise. With the help of second argument this function can
-// limit number of returned events to save resources. Returning false from this
-// function will make client request missing events again after given event
-// batch is consumed.
+// ResyncFn should return all events in a given range in a slice. If the second
+// return variable err is not nil the subscription will disconnect with error.
 //
 // Correct implementation of this function is essential for proper client
 // resync and vital to whole SSE functionality.
-type ResyncFn func(topic string, fromID, toID interface{}) (events []Event, ok bool)
+type ResyncFn func(topic string, fromID, toID interface{}) (events []Event, err error)
 
 // FilterFn is a callback function used to mutate event stream for individual
 // subscriptions. This function will be invoked for each event before sending it
