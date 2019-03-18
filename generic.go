@@ -80,7 +80,7 @@ func (s *GenericStream) SubscribeTopicFiltered(w http.ResponseWriter, topic stri
 			return nil
 		}
 		if len(list) == 0 {
-			return Respond(w, prependStream(events, source), &s.cfg, s.responseStop)
+			return Respond(w, prependStream(events, applyChanFilter(source, f)), &s.cfg, s.responseStop)
 		}
 		switch f {
 		case nil:
