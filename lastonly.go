@@ -1,7 +1,9 @@
 package sseserver
 
 import (
+	"errors"
 	"net/http"
+	"sort"
 	"sync"
 )
 
@@ -13,18 +15,23 @@ type LastOnlyStream struct {
 	wg sync.WaitGroup
 
 	sync.RWMutex
-	last map[string]*Event
+	lastEventID interface{}
+	last        map[string]map[string]*Event
 }
+
+var errFiltersNotSupported = errors.New("filters are not supported")
 
 // NewLastOnly creates a new sse stream that resends only last seen event to all
 // newly connected clients. If client alredy have seen the lates event is is not
 // repeated.
+//
+// Event filtering is not supported.
 func NewLastOnly(cfg Config) *LastOnlyStream {
 	s := &LastOnlyStream{
 		broker:       newBroker(),
 		cfg:          cfg,
 		responseStop: make(chan struct{}),
-		last:         make(map[string]*Event),
+		last:         make(map[string]map[string]*Event),
 	}
 	s.wg.Add(1)
 	go func() {
@@ -43,7 +50,11 @@ func (s *LastOnlyStream) PublishTopic(topic string, event *Event) {
 	s.broker.publish(topic, event, func(lastID interface{}) {
 		s.Lock()
 		defer s.Unlock()
-		s.last[topic] = event
+		if _, ok := s.last[topic]; !ok {
+			s.last[topic] = make(map[string]*Event)
+		}
+		s.last[topic][event.Event] = event
+		s.lastEventID = event.ID
 	})
 }
 
@@ -69,16 +80,31 @@ func (s *LastOnlyStream) SubscribeTopic(w http.ResponseWriter, topic string, las
 }
 
 func (s *LastOnlyStream) SubscribeTopicFiltered(w http.ResponseWriter, topic string, lastEventID interface{}, f FilterFn) error {
+	if f != nil {
+		return errFiltersNotSupported
+	}
+
 	source := make(chan *Event, s.cfg.QueueLength)
 	s.broker.subscribe(topic, source)
 	defer s.broker.unsubscribe(source)
 
 	s.RLock()
 	last := s.last[topic]
+	events := make([]Event, 0)
+	if len(last) > 0 && lastEventID != s.lastEventID {
+		s := make([]string, 0)
+		for key := range last {
+			s = append(s, key)
+		}
+		sort.Strings(s)
+		for _, k := range s {
+			events = append(events, *last[k])
+		}
+	}
 	s.RUnlock()
 
-	if last != nil && last.ID != lastEventID {
-		return Respond(w, applyChanFilter(prependStream([]Event{*last}, source), f), &s.cfg, s.responseStop)
+	if len(events) > 0 {
+		return Respond(w, applyChanFilter(prependStream(events, source), f), &s.cfg, s.responseStop)
 	}
 
 	return Respond(w, applyChanFilter(source, f), &s.cfg, s.responseStop)
