@@ -14,13 +14,13 @@ var _ Stream = &GenericStream{}
 var _ MultiStream = &GenericStream{}
 
 func resyncGenerator(events []Event, err error) ResyncFn {
-	return func(topic string, fromID, toID interface{}) ([]Event, error) {
+	return func(topic string, fromID, toID string) ([]Event, error) {
 		return events, err
 	}
 }
 
 func TestGenericDisconnect(t *testing.T) {
-	stream := NewGeneric(resyncGenerator(nil, errors.New("error")), nil, Config{
+	stream := NewGeneric(resyncGenerator(nil, errors.New("error")), "first", Config{
 		Reconnect:             0,
 		KeepAlive:             0,
 		Lifetime:              10 * time.Millisecond,
@@ -30,13 +30,13 @@ func TestGenericDisconnect(t *testing.T) {
 	defer stream.Stop()
 
 	w := httptest.NewRecorder()
-	stream.Subscribe(w, nil)
+	stream.Subscribe(w, "first")
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
 }
 
 func TestGenericResyncThreshold(t *testing.T) {
-	expected := []Event{{ID: 1}, {ID: 2}}
-	stream := NewGeneric(resyncGenerator(expected, nil), nil, Config{
+	expected := []Event{{ID: "1"}, {ID: "2"}}
+	stream := NewGeneric(resyncGenerator(expected, nil), "first", Config{
 		Reconnect:             0,
 		KeepAlive:             0,
 		Lifetime:              10 * time.Millisecond,
@@ -46,21 +46,21 @@ func TestGenericResyncThreshold(t *testing.T) {
 	defer stream.Stop()
 
 	w := httptest.NewRecorder()
-	stream.Subscribe(w, nil)
+	stream.Subscribe(w, "")
 	assertReceivedEvents(t, w, expected...)
 }
 
 func TestGenericResyncBeforeDisconnect(t *testing.T) {
-	expected := []Event{{ID: 1}, {ID: 2}}
+	expected := []Event{{ID: "1"}, {ID: "2"}}
 	var synced bool
-	resync := func(topic string, fromID, toID interface{}) ([]Event, error) {
+	resync := func(topic string, fromID, toID string) ([]Event, error) {
 		if !synced {
 			synced = true
 			return expected, nil
 		}
 		return nil, errors.New("synced")
 	}
-	stream := NewGeneric(resync, nil, Config{
+	stream := NewGeneric(resync, "first", Config{
 		Reconnect:             0,
 		KeepAlive:             0,
 		Lifetime:              10 * time.Millisecond,
@@ -71,19 +71,19 @@ func TestGenericResyncBeforeDisconnect(t *testing.T) {
 
 	// Get resynced events
 	w1 := httptest.NewRecorder()
-	stream.Subscribe(w1, nil)
+	stream.Subscribe(w1, "")
 	assertReceivedEvents(t, w1, expected...)
 
 	// Client reconnects after resync
 	w2 := httptest.NewRecorder()
-	stream.Subscribe(w2, 2)
+	stream.Subscribe(w2, "2")
 	assert.Equal(t, http.StatusInternalServerError, w2.Code)
 }
 
 func TestGenericInitialLastEventID(t *testing.T) {
-	initialID := 15
-	var actualID interface{}
-	resync := func(topcic string, fromID, toID interface{}) ([]Event, error) {
+	initialID := "15"
+	var actualID string
+	resync := func(topcic string, fromID, toID string) ([]Event, error) {
 		actualID = toID
 		return nil, nil
 	}
@@ -97,7 +97,7 @@ func TestGenericInitialLastEventID(t *testing.T) {
 	defer stream.Stop()
 
 	w := httptest.NewRecorder()
-	stream.Subscribe(w, nil)
+	stream.Subscribe(w, "")
 	assertReceivedEvents(t, w)
 	assert.Equal(t, initialID, actualID)
 }
@@ -105,11 +105,11 @@ func TestGenericInitialLastEventID(t *testing.T) {
 func TestGenericResyncTopic(t *testing.T) {
 	const topic = "some-topic"
 	var receivedTopic string
-	resync := func(topic string, fromID, toID interface{}) ([]Event, error) {
+	resync := func(topic string, fromID, toID string) ([]Event, error) {
 		receivedTopic = topic
 		return nil, nil
 	}
-	stream := NewGeneric(resync, nil, Config{
+	stream := NewGeneric(resync, "first", Config{
 		Reconnect:             0,
 		KeepAlive:             0,
 		Lifetime:              10 * time.Millisecond,
@@ -119,27 +119,27 @@ func TestGenericResyncTopic(t *testing.T) {
 	defer stream.Stop()
 
 	w := httptest.NewRecorder()
-	stream.SubscribeTopic(w, topic, 0)
+	stream.SubscribeTopic(w, topic, "0")
 	assertReceivedEvents(t, w)
 	assert.Equal(t, topic, receivedTopic, "resync function received another topic")
 }
 
 func TestPrependStream(t *testing.T) {
 	events := []Event{
-		{ID: 1},
-		{ID: 2},
+		{ID: "1"},
+		{ID: "2"},
 	}
 
 	stream := make(chan *Event, 2)
-	stream <- &Event{ID: 3}
-	stream <- &Event{ID: 4}
+	stream <- &Event{ID: "3"}
+	stream <- &Event{ID: "4"}
 	close(stream)
 
 	expected := []Event{
-		{ID: 1},
-		{ID: 2},
-		{ID: 3},
-		{ID: 4},
+		{ID: "1"},
+		{ID: "2"},
+		{ID: "3"},
+		{ID: "4"},
 	}
 
 	combined := prependStream(events, stream)
@@ -159,8 +159,8 @@ func TestPrependStream(t *testing.T) {
 // passed instead of source stream
 func TestPrependStreamStatic(t *testing.T) {
 	events := []Event{
-		{ID: 1},
-		{ID: 2},
+		{ID: "1"},
+		{ID: "2"},
 	}
 
 	combined := prependStream(events, nil)

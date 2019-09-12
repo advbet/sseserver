@@ -45,8 +45,8 @@ type Config struct {
 
 // Event holds data for single event in SSE stream.
 type Event struct {
-	ID    interface{} // ID value will be converted to string with fmt package
-	Event string
+	ID    string      // ID value
+	Event string      // Event type value
 	Data  interface{} // Data value will be marshaled to JSON
 }
 
@@ -170,8 +170,8 @@ func write(w io.Writer, e *Event) error {
 	if e == nil {
 		return nil
 	}
-	if e.ID != nil {
-		if _, err := fmt.Fprintf(w, "id: %v\n", e.ID); err != nil {
+	if e.ID != "" {
+		if _, err := fmt.Fprintf(w, "id: %s\n", e.ID); err != nil {
 			return err
 		}
 	}

@@ -9,7 +9,7 @@ import (
 	"bitbucket.org/advbet/sseserver"
 )
 
-func newEvent(topic string, id int) *sseserver.Event {
+func newEvent(topic string, id string) *sseserver.Event {
 	return &sseserver.Event{
 		ID:    id,
 		Event: "counter",
@@ -21,15 +21,21 @@ func newEvent(topic string, id int) *sseserver.Event {
 	}
 }
 
-func lookupEvents(topic string, fromI interface{}, toI interface{}) ([]sseserver.Event, error) {
-	if fromI == nil {
+func lookupEvents(topic string, fromStr string, toStr string) ([]sseserver.Event, error) {
+	if fromStr == "" {
 		// New client
 		// no resync, continue sending live events
 		return nil, nil
 	}
 
-	from := fromI.(int)
-	to := toI.(int)
+	from, err := strconv.Atoi(fromStr)
+	if err != nil {
+		return nil, err
+	}
+	to, err := strconv.Atoi(toStr)
+	if err != nil {
+		return nil, err
+	}
 
 	if from >= to {
 		// Client is up to date
@@ -42,13 +48,13 @@ func lookupEvents(topic string, fromI interface{}, toI interface{}) ([]sseserver
 	case to-from > 10:
 		// do not resync more than 10 events at a time
 		for i := from + 1; i <= from+10; i++ {
-			events = append(events, *newEvent(topic, i))
+			events = append(events, *newEvent(topic, strconv.Itoa(i)))
 		}
 		// send first 10 missing events
 		return events, nil
 	default:
 		for i := from + 1; i <= to; i++ {
-			events = append(events, *newEvent(topic, i))
+			events = append(events, *newEvent(topic, strconv.Itoa(i)))
 		}
 		// send missing events, continue sending live events
 		return events, nil
@@ -61,23 +67,20 @@ func eventGenerator(stream sseserver.Stream) {
 
 	for range c {
 		i++
-		stream.Publish(newEvent("", i))
+		stream.Publish(newEvent("", strconv.Itoa(i)))
 	}
 }
 
 func Example_generic() {
-	stream := sseserver.NewGeneric(lookupEvents, 0, sseserver.DefaultConfig)
+	stream := sseserver.NewGeneric(lookupEvents, "0", sseserver.DefaultConfig)
 	go eventGenerator(stream)
 
 	requestHandler := func(w http.ResponseWriter, r *http.Request) {
-		var id interface{}
 		var err error
-
-		if id, err = strconv.Atoi(r.Header.Get("Last-Event-ID")); err != nil {
+		if _, err = strconv.Atoi(r.Header.Get("Last-Event-ID")); err != nil {
 			fmt.Println(err)
-			id = nil
 		}
-		err = stream.Subscribe(w, id)
+		err = stream.Subscribe(w, r.Header.Get("Last-Event-ID"))
 		if err != nil {
 			fmt.Println(err)
 		}

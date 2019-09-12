@@ -22,7 +22,7 @@ type GenericStream struct {
 // Argument lastID is used set last event ID that was published before
 // application was started, this value is passed to the resync function and
 // later replaced by the events published with stream.Publish method.
-func NewGeneric(resync ResyncFn, lastID interface{}, cfg Config) *GenericStream {
+func NewGeneric(resync ResyncFn, lastID string, cfg Config) *GenericStream {
 	s := &GenericStream{
 		broker:       newBroker(),
 		resync:       resync,
@@ -32,7 +32,7 @@ func NewGeneric(resync ResyncFn, lastID interface{}, cfg Config) *GenericStream 
 	s.wg.Add(1)
 	go func() {
 		defer s.wg.Done()
-		s.broker.run(map[string]interface{}{"": lastID})
+		s.broker.run(map[string]string{"": lastID})
 	}()
 	return s
 }
@@ -46,23 +46,23 @@ func (s *GenericStream) PublishTopic(topic string, event *Event) {
 }
 
 func (s *GenericStream) PublishBroadcast(event *Event) {
-	event.ID = nil
+	event.ID = ""
 	s.broker.broadcast(event)
 }
 
-func (s *GenericStream) Subscribe(w http.ResponseWriter, lastEventID interface{}) error {
+func (s *GenericStream) Subscribe(w http.ResponseWriter, lastEventID string) error {
 	return s.SubscribeTopicFiltered(w, "", lastEventID, nil)
 }
 
-func (s *GenericStream) SubscribeFiltered(w http.ResponseWriter, lastEventID interface{}, f FilterFn) error {
+func (s *GenericStream) SubscribeFiltered(w http.ResponseWriter, lastEventID string, f FilterFn) error {
 	return s.SubscribeTopicFiltered(w, "", lastEventID, f)
 }
 
-func (s *GenericStream) SubscribeTopic(w http.ResponseWriter, topic string, lastEventID interface{}) error {
+func (s *GenericStream) SubscribeTopic(w http.ResponseWriter, topic string, lastEventID string) error {
 	return s.SubscribeTopicFiltered(w, topic, lastEventID, nil)
 }
 
-func (s *GenericStream) SubscribeTopicFiltered(w http.ResponseWriter, topic string, lastEventID interface{}, f FilterFn) error {
+func (s *GenericStream) SubscribeTopicFiltered(w http.ResponseWriter, topic string, lastEventID string, f FilterFn) error {
 	source := make(chan *Event, s.cfg.QueueLength)
 	toID := s.broker.subscribe(topic, source)
 	defer s.broker.unsubscribe(source)

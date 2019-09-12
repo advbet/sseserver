@@ -15,7 +15,7 @@ type LastOnlyStream struct {
 	wg sync.WaitGroup
 
 	sync.RWMutex
-	lastEventID interface{}
+	lastEventID string
 	last        map[string]map[string]*Event
 }
 
@@ -47,7 +47,7 @@ func (s *LastOnlyStream) Publish(event *Event) {
 }
 
 func (s *LastOnlyStream) PublishTopic(topic string, event *Event) {
-	s.broker.publish(topic, event, func(lastID interface{}) {
+	s.broker.publish(topic, event, func(lastID string) {
 		s.Lock()
 		defer s.Unlock()
 		if _, ok := s.last[topic]; !ok {
@@ -63,23 +63,23 @@ func (s *LastOnlyStream) PublishTopic(topic string, event *Event) {
 func (s *LastOnlyStream) PublishBroadcast(event *Event) {
 	// LastOnly SSE stream does not support tracking broadcasted events. This
 	// removes ID value from all broadcasted events.
-	event.ID = nil
+	event.ID = ""
 	s.broker.broadcast(event)
 }
 
-func (s *LastOnlyStream) Subscribe(w http.ResponseWriter, lastEventID interface{}) error {
+func (s *LastOnlyStream) Subscribe(w http.ResponseWriter, lastEventID string) error {
 	return s.SubscribeTopicFiltered(w, "", lastEventID, nil)
 }
 
-func (s *LastOnlyStream) SubscribeFiltered(w http.ResponseWriter, lastEventID interface{}, f FilterFn) error {
+func (s *LastOnlyStream) SubscribeFiltered(w http.ResponseWriter, lastEventID string, f FilterFn) error {
 	return s.SubscribeTopicFiltered(w, "", lastEventID, f)
 }
 
-func (s *LastOnlyStream) SubscribeTopic(w http.ResponseWriter, topic string, lastEventID interface{}) error {
+func (s *LastOnlyStream) SubscribeTopic(w http.ResponseWriter, topic string, lastEventID string) error {
 	return s.SubscribeTopicFiltered(w, topic, lastEventID, nil)
 }
 
-func (s *LastOnlyStream) SubscribeTopicFiltered(w http.ResponseWriter, topic string, lastEventID interface{}, f FilterFn) error {
+func (s *LastOnlyStream) SubscribeTopicFiltered(w http.ResponseWriter, topic string, lastEventID string, f FilterFn) error {
 	if f != nil {
 		return errFiltersNotSupported
 	}

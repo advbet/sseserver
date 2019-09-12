@@ -1,6 +1,7 @@
 package sseserver
 
 import (
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -11,17 +12,17 @@ import (
 func TestBrokerLastID(t *testing.T) {
 	broker := newBroker()
 	defer close(broker)
-	go broker.run(map[string]interface{}{"": 123})
+	go broker.run(map[string]string{"": "123"})
 
 	// Before any publishings last ID should be the same as given when
 	// starting broker goroutine
-	assert.Equal(t, 123, broker.subscribe("", make(chan *Event)))
+	assert.Equal(t, "123", broker.subscribe("", make(chan *Event)))
 
-	broker.publish("", &Event{ID: 1}, nil)
-	assert.Equal(t, 1, broker.subscribe("", make(chan *Event)))
+	broker.publish("", &Event{ID: "1"}, nil)
+	assert.Equal(t, "1", broker.subscribe("", make(chan *Event)))
 
-	broker.publish("", &Event{ID: 2}, nil)
-	assert.Equal(t, 2, broker.subscribe("", make(chan *Event)))
+	broker.publish("", &Event{ID: "2"}, nil)
+	assert.Equal(t, "2", broker.subscribe("", make(chan *Event)))
 }
 
 // TestBorkerLastIDTopics checks if using multiple topics does track event IDs
@@ -29,25 +30,25 @@ func TestBrokerLastID(t *testing.T) {
 func TestBrokerLastIDTopics(t *testing.T) {
 	broker := newBroker()
 	defer close(broker)
-	go broker.run(map[string]interface{}{
-		"topic1": 123,
-		"topic2": 456,
+	go broker.run(map[string]string{
+		"topic1": "123",
+		"topic2": "456",
 	})
 
 	// Before any publishings last ID should be the same as given when
 	// starting broker goroutine
-	assert.Equal(t, 123, broker.subscribe("topic1", make(chan *Event)))
-	assert.Equal(t, 456, broker.subscribe("topic2", make(chan *Event)))
+	assert.Equal(t, "123", broker.subscribe("topic1", make(chan *Event)))
+	assert.Equal(t, "456", broker.subscribe("topic2", make(chan *Event)))
 
 	// Publish on topic1
-	broker.publish("topic1", &Event{ID: 1}, nil)
-	assert.Equal(t, 1, broker.subscribe("topic1", make(chan *Event)))
-	assert.Equal(t, 456, broker.subscribe("topic2", make(chan *Event)))
+	broker.publish("topic1", &Event{ID: "1"}, nil)
+	assert.Equal(t, "1", broker.subscribe("topic1", make(chan *Event)))
+	assert.Equal(t, "456", broker.subscribe("topic2", make(chan *Event)))
 
 	// Publish on topic2
-	broker.publish("topic2", &Event{ID: 2}, nil)
-	assert.Equal(t, 1, broker.subscribe("topic1", make(chan *Event)))
-	assert.Equal(t, 2, broker.subscribe("topic2", make(chan *Event)))
+	broker.publish("topic2", &Event{ID: "2"}, nil)
+	assert.Equal(t, "1", broker.subscribe("topic1", make(chan *Event)))
+	assert.Equal(t, "2", broker.subscribe("topic2", make(chan *Event)))
 }
 
 // TestBrokerStop cheks if closing broker closes all subscribers.
@@ -83,7 +84,7 @@ func TestBrokerPublish(t *testing.T) {
 	}
 
 	// emit single event
-	event := &Event{ID: 15, Event: "test", Data: "ok"}
+	event := &Event{ID: "15", Event: "test", Data: "ok"}
 	broker.publish("", event, nil)
 
 	// check if all clients received it
@@ -113,10 +114,10 @@ func TestBrokerPublishTopics(t *testing.T) {
 	}
 
 	// emit single event
-	event1 := &Event{ID: 15, Event: "test1", Data: "ok1"}
+	event1 := &Event{ID: "15", Event: "test1", Data: "ok1"}
 	broker.publish("topic1", event1, nil)
 
-	event2 := &Event{ID: 17, Event: "test2", Data: "ok2"}
+	event2 := &Event{ID: "17", Event: "test2", Data: "ok2"}
 	broker.publish("topic2", event2, nil)
 
 	// check if all clients received it
@@ -146,7 +147,7 @@ func TestBrokerPublishFull(t *testing.T) {
 	// Emit 6 events to overflow the client, naive broker implementation
 	// would block when sending fourth event
 	for i := 0; i < cap(client)*2; i++ {
-		broker.publish("", &Event{ID: i}, nil)
+		broker.publish("", &Event{ID: strconv.Itoa(i)}, nil)
 	}
 
 	// Drain event from the client buffer, check if events are received in
@@ -154,7 +155,7 @@ func TestBrokerPublishFull(t *testing.T) {
 	for i := 0; i < cap(client); i++ {
 		e, ok := <-client
 		assert.True(t, ok)
-		assert.Equal(t, &Event{ID: i}, e)
+		assert.Equal(t, &Event{ID: strconv.Itoa(i)}, e)
 	}
 
 	// Assert that broker have not buffered any overflowed events and closed
@@ -172,13 +173,13 @@ func TestBrokerUnsubscribe(t *testing.T) {
 
 	client := make(chan *Event, 10)
 	broker.subscribe("", client)
-	broker.publish("", &Event{ID: 10}, nil)
+	broker.publish("", &Event{ID: "10"}, nil)
 	broker.unsubscribe(client)
 	<-client
 
 	// client should not receive events published after client is
 	// disconnected
-	broker.publish("", &Event{ID: 20}, nil)
+	broker.publish("", &Event{ID: "20"}, nil)
 
 	// assert client channel is closed and have not received the second
 	// event
@@ -203,7 +204,7 @@ func TestBorkerBroadcast(t *testing.T) {
 	}
 
 	// emit single event
-	event := &Event{ID: 15, Event: "test1", Data: "ok1"}
+	event := &Event{ID: "15", Event: "test1", Data: "ok1"}
 	broker.broadcast(event)
 
 	// check if all clients received it

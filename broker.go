@@ -7,11 +7,11 @@ type command struct {
 	op    operation
 	topic string
 
-	sink     chan<- *Event      // used for subscribe, unsubscribe
-	response chan<- interface{} // used for subscribe
+	sink     chan<- *Event // used for subscribe, unsubscribe
+	response chan<- string // used for subscribe
 
-	event      *Event            // used for publish
-	prePublish func(interface{}) // used for publish
+	event      *Event       // used for publish
+	prePublish func(string) // used for publish
 }
 
 // brokerChan is an implementation of single pub-sub communications channel.
@@ -34,7 +34,7 @@ func newBroker() brokerChan {
 //
 // prePublish will be called by broker before publishing event with last event
 // ID as an argument.
-func (b brokerChan) publish(topic string, event *Event, prePublish func(interface{})) {
+func (b brokerChan) publish(topic string, event *Event, prePublish func(string)) {
 	b <- command{
 		op:         publish,
 		topic:      topic,
@@ -54,8 +54,8 @@ func (b brokerChan) broadcast(event *Event) {
 
 // subscribe adds subscribes given channel to receive all events published to
 // this broker.
-func (b brokerChan) subscribe(topic string, events chan<- *Event) interface{} {
-	response := make(chan interface{}, 1)
+func (b brokerChan) subscribe(topic string, events chan<- *Event) string {
+	response := make(chan string, 1)
 	b <- command{
 		op:       subscribe,
 		topic:    topic,
@@ -78,10 +78,10 @@ func (b brokerChan) unsubscribe(ch chan<- *Event) {
 
 // run handles event broadcasting and manages subscription lists. Each started
 // stream have this code running in a separate goroutine.
-func (b brokerChan) run(lastIDs map[string]interface{}) {
+func (b brokerChan) run(lastIDs map[string]string) {
 	sinks := make(map[chan<- *Event]string)
 	if lastIDs == nil {
-		lastIDs = make(map[string]interface{})
+		lastIDs = make(map[string]string)
 	}
 
 	emit := func(ch chan<- *Event, event *Event) {
@@ -111,7 +111,7 @@ func (b brokerChan) run(lastIDs map[string]interface{}) {
 			}
 		case broadcast:
 			for ch, topic := range sinks {
-				if cmd.event.ID != nil {
+				if cmd.event.ID != "" {
 					lastIDs[topic] = cmd.event.ID
 				}
 				emit(ch, cmd.event)
@@ -120,7 +120,9 @@ func (b brokerChan) run(lastIDs map[string]interface{}) {
 			if cmd.prePublish != nil {
 				cmd.prePublish(lastIDs[cmd.topic])
 			}
-			lastIDs[cmd.topic] = cmd.event.ID
+			if cmd.event.ID != "" {
+				lastIDs[cmd.topic] = cmd.event.ID
+			}
 			for ch, topic := range sinks {
 				if topic != cmd.topic {
 					continue

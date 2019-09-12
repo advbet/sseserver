@@ -32,15 +32,21 @@ var ErrCacheMiss = errors.New("missing events in cache")
 // expiration time in local cache and clients are automatically resynced on
 // reconnect.
 //
-// Passing nil or empty string as last event ID for Subscribe() would connect
-// client without resync.
+// Passing empty string as last event ID for Subscribe() would connect client
+// without resync.
 //
 // Call to Subscribe() might return ErrCacheMiss if client requests to resync
 // from an event not found in the cache. If ErrCacheMiss is returned user of
 // this library is responsible for generating HTTP response to the client. It is
 // recommended to return 204 no content response to stop client from
 // reconnecting until he syncs event state manually.
-func NewCached(lastID interface{}, cfg Config, expiration, cleanup time.Duration) *CachedStream {
+func NewCached(lastID string, cfg Config, expiration, cleanup time.Duration) *CachedStream {
+	return NewCachedMultiStream(map[string]string{"": lastID}, cfg, expiration, cleanup)
+}
+
+// NewCachedMultiStream is similar to NewCached but allows setting initial last
+// event ID values for multiple topics.
+func NewCachedMultiStream(lastIDs map[string]string, cfg Config, expiration, cleanup time.Duration) *CachedStream {
 	s := &CachedStream{
 		broker:       newBroker(),
 		cfg:          cfg,
@@ -50,9 +56,7 @@ func NewCached(lastID interface{}, cfg Config, expiration, cleanup time.Duration
 	s.wg.Add(1)
 	go func() {
 		defer s.wg.Done()
-		s.broker.run(map[string]interface{}{
-			"": lastID,
-		})
+		s.broker.run(lastIDs)
 	}()
 
 	return s
@@ -63,7 +67,7 @@ func (s *CachedStream) Publish(event *Event) {
 }
 
 func (s *CachedStream) PublishTopic(topic string, event *Event) {
-	s.broker.publish(topic, event, func(lastID interface{}) {
+	s.broker.publish(topic, event, func(lastID string) {
 		s.cache.Set(topicIDKey(topic, lastID), event, cache.DefaultExpiration)
 	})
 }
@@ -71,37 +75,35 @@ func (s *CachedStream) PublishTopic(topic string, event *Event) {
 func (s *CachedStream) PublishBroadcast(event *Event) {
 	// Cached SSE stream does not support tracking broadcasted events. This
 	// removes ID value from all broadcasted events.
-	event.ID = nil
+	event.ID = ""
 	s.broker.broadcast(event)
 }
 
-func (s *CachedStream) Subscribe(w http.ResponseWriter, lastClientID interface{}) error {
+func (s *CachedStream) Subscribe(w http.ResponseWriter, lastClientID string) error {
 	return s.SubscribeTopicFiltered(w, "", lastClientID, nil)
 }
 
-func (s *CachedStream) SubscribeFiltered(w http.ResponseWriter, lastClientID interface{}, f FilterFn) error {
+func (s *CachedStream) SubscribeFiltered(w http.ResponseWriter, lastClientID string, f FilterFn) error {
 	return s.SubscribeTopicFiltered(w, "", lastClientID, f)
 }
 
-func (s *CachedStream) SubscribeTopic(w http.ResponseWriter, topic string, lastClientID interface{}) error {
+func (s *CachedStream) SubscribeTopic(w http.ResponseWriter, topic string, lastClientID string) error {
 	return s.SubscribeTopicFiltered(w, topic, lastClientID, nil)
 }
 
-func (s *CachedStream) SubscribeTopicFiltered(w http.ResponseWriter, topic string, lastClientID interface{}, f FilterFn) error {
+func (s *CachedStream) SubscribeTopicFiltered(w http.ResponseWriter, topic string, lastClientID string, f FilterFn) error {
 	source := make(chan *Event, s.cfg.QueueLength)
 	lastServerID := s.broker.subscribe(topic, source)
 	defer s.broker.unsubscribe(source)
 
-	serverID := fmt.Sprintf("%v", lastServerID)
-	clientID := fmt.Sprintf("%v", lastClientID)
-	if lastClientID == nil || clientID == "" || clientID == serverID {
+	if lastClientID == "" || lastClientID == lastServerID {
 		// no resync needed
 		return Respond(w, applyChanFilter(source, f), &s.cfg, s.responseStop)
 	}
 
 	var events []Event
 	for {
-		eventIface, ok := s.cache.Get(topicIDKey(topic, clientID))
+		eventIface, ok := s.cache.Get(topicIDKey(topic, lastClientID))
 		if !ok {
 			return ErrCacheMiss
 		}
@@ -109,8 +111,8 @@ func (s *CachedStream) SubscribeTopicFiltered(w http.ResponseWriter, topic strin
 		event := eventIface.(*Event)
 		events = append(events, *event)
 
-		clientID = fmt.Sprintf("%v", event.ID)
-		if serverID == clientID {
+		lastClientID = event.ID
+		if lastServerID == lastClientID {
 			break
 		}
 	}
@@ -126,7 +128,6 @@ func (s *CachedStream) Stop() {
 	s.wg.Wait()
 }
 
-func topicIDKey(topic string, id interface{}) string {
-	strID := fmt.Sprintf("%v", id)
-	return fmt.Sprintf("%d:%s%d:%s", len(topic), topic, len(strID), strID)
+func topicIDKey(topic string, id string) string {
+	return fmt.Sprintf("%d:%s%d:%s", len(topic), topic, len(id), id)
 }

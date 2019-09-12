@@ -3,6 +3,7 @@ package sseserver
 import (
 	"bytes"
 	"net/http/httptest"
+	"strconv"
 	"testing"
 	"time"
 
@@ -23,7 +24,7 @@ func assertReceivedEvents(t *testing.T, resp *httptest.ResponseRecorder, events 
 }
 
 func TestCachedResync(t *testing.T) {
-	stream := NewCached(nil, Config{
+	stream := NewCached("first", Config{
 		Reconnect:   0,
 		KeepAlive:   0,
 		Lifetime:    10 * time.Millisecond,
@@ -32,21 +33,21 @@ func TestCachedResync(t *testing.T) {
 	defer stream.Stop()
 
 	// Publish two events
-	event1 := Event{ID: 16}
+	event1 := Event{ID: "16"}
 	stream.Publish(&event1)
-	event2 := Event{ID: 32}
+	event2 := Event{ID: "32"}
 	stream.Publish(&event2)
 
 	w := httptest.NewRecorder()
 	// connect with initial last event ID to receive both cached events
-	stream.Subscribe(w, "<nil>")
+	stream.Subscribe(w, "first")
 
 	// Assert both events were received
 	assertReceivedEvents(t, w, event1, event2)
 }
 
 func TestCachedResyncWithBroadcast(t *testing.T) {
-	stream := NewCached(nil, Config{
+	stream := NewCached("first", Config{
 		Reconnect:   0,
 		KeepAlive:   0,
 		Lifetime:    10 * time.Millisecond,
@@ -55,23 +56,23 @@ func TestCachedResyncWithBroadcast(t *testing.T) {
 	defer stream.Stop()
 
 	// Publish two events, with broadcast in between
-	event1 := Event{ID: 16}
+	event1 := Event{ID: "16"}
 	stream.Publish(&event1)
-	stream.PublishBroadcast(&Event{ID: 999})
-	event2 := Event{ID: 32}
+	stream.PublishBroadcast(&Event{ID: "999"})
+	event2 := Event{ID: "32"}
 	stream.Publish(&event2)
 
 	w := httptest.NewRecorder()
 	// connect with initial last event ID to receive both cached events,
 	// broadcasted event should be excluded
-	stream.Subscribe(w, "<nil>")
+	stream.Subscribe(w, "first")
 
 	// Assert both events were received
 	assertReceivedEvents(t, w, event1, event2)
 }
 
 func TestCachedError(t *testing.T) {
-	stream := NewCached(8, Config{
+	stream := NewCached("8", Config{
 		Reconnect:   0,
 		KeepAlive:   0,
 		Lifetime:    10 * time.Millisecond,
@@ -86,7 +87,10 @@ func TestCachedError(t *testing.T) {
 }
 
 func TestCachedResyncTopics(t *testing.T) {
-	stream := NewCached(nil, Config{
+	stream := NewCachedMultiStream(map[string]string{
+		"topic1": "first1",
+		"topic2": "first2",
+	}, Config{
 		Reconnect:   0,
 		KeepAlive:   0,
 		Lifetime:    10 * time.Millisecond,
@@ -97,23 +101,23 @@ func TestCachedResyncTopics(t *testing.T) {
 	// Generate two sub-streams of events
 	var events1, events2 []Event
 	for i := 0; i < 5; i++ {
-		event1 := Event{ID: i * 10}
+		event1 := Event{ID: strconv.Itoa(i * 10)}
 		events1 = append(events1, event1)
 		stream.PublishTopic("topic1", &event1)
 
-		event2 := Event{ID: i * 20}
+		event2 := Event{ID: strconv.Itoa(i * 20)}
 		events2 = append(events2, event2)
 		stream.PublishTopic("topic2", &event2)
 	}
 
 	t.Run("with topic1", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		stream.SubscribeTopic(w, "topic1", "<nil>")
+		stream.SubscribeTopic(w, "topic1", "first1")
 		assertReceivedEvents(t, w, events1...)
 	})
 	t.Run("with topic2", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		stream.SubscribeTopic(w, "topic2", "<nil>")
+		stream.SubscribeTopic(w, "topic2", "first2")
 		assertReceivedEvents(t, w, events2...)
 	})
 }

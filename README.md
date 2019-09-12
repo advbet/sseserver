@@ -13,6 +13,7 @@ package sseserver_test
 import (
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"bitbucket.org/advbet/sseserver"
@@ -21,7 +22,7 @@ import (
 func eventSource(stream sseserver.Stream) {
 	for i := 0; true; i++ {
 		stream.Publish(&sseserver.Event{
-			ID:    i,
+			ID:    strconv.Itoa(i),
 			Event: "counter",
 			Data: map[string]interface{}{
 				"msg": "ticks since start",
@@ -33,15 +34,11 @@ func eventSource(stream sseserver.Stream) {
 }
 
 func main() {
-	stream := sseserver.NewCached(nil, sseserver.DefaultConfig, 5*time.Minute, time.Minute)
+	stream := sseserver.NewCached("", sseserver.DefaultConfig, 5*time.Minute, time.Minute)
 	go eventSource(stream)
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		var id interface{}
-		lastID := r.Header.Get("Last-Event-ID")
-		if lastID != "" {
-			id = lastID
-		}
+		id := r.Header.Get("Last-Event-ID")
 		if err := stream.Subscribe(w, id); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}

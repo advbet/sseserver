@@ -34,19 +34,19 @@ type Stream interface {
 	Stop()
 
 	// Subscribe handles HTTP request to receive SSE stream for a default
-	// topic. Caller of this function should parse Last-Event-ID header and
-	// create appropriate lastEventID object.
+	// topic. Caller is responsible for extracting Last event ID value from
+	// the request.
 	//
 	// Subscribe on a stopped stream will cause panic.
-	Subscribe(w http.ResponseWriter, lastEventID interface{}) error
+	Subscribe(w http.ResponseWriter, lastEventID string) error
 
 	// SubscribeFiltered is similar to Subscribe but each event before being
 	// sent to client will be passed to given filtering function. Events
 	// returned by the filtering function will be used instead.
-	SubscribeFiltered(w http.ResponseWriter, lastEventID interface{}, f FilterFn) error
+	SubscribeFiltered(w http.ResponseWriter, lastEventID string, f FilterFn) error
 }
 
-// MutiStream is an abstraction of multiple SSE streams. Single instance of
+// MultiStream is an abstraction of multiple SSE streams. Single instance of
 // object could be used to transmit multiple independent SSE stream. Each stream
 // is identified by a unique topic name. Application can broadcast events using
 // stream.PublishTopic method. HTTP handlers for SSE client endpoints should use
@@ -83,16 +83,16 @@ type MultiStream interface {
 	Stop()
 
 	// Subscribe handles HTTP request to receive SSE stream for a given
-	// topic. Caller of this function should parse Last-Event-ID header and
-	// create appropriate lastEventID object.
+	// topic. Caller is responsible for extracting Last event ID value from
+	// the request.
 	//
 	// Subscribe on a stopped stream will cause panic.
-	SubscribeTopic(w http.ResponseWriter, topic string, lastEventID interface{}) error
+	SubscribeTopic(w http.ResponseWriter, topic string, lastEventID string) error
 
 	// SubscribeFiltered is similar to Subscribe but each event before being
 	// sent to client will be passed to given filtering function. Events
 	// returned by the filtering function will be used instead.
-	SubscribeTopicFiltered(w http.ResponseWriter, topic string, lastEventID interface{}, f FilterFn) error
+	SubscribeTopicFiltered(w http.ResponseWriter, topic string, lastEventID string, f FilterFn) error
 }
 
 // ResyncFn is a definition of function used to lookup events missed by
@@ -107,18 +107,18 @@ type MultiStream interface {
 // repeatedly until an empty events slice is returned (no more missing events)
 // or ResyncEventsThreshold is reached. Note that event with ID equal to fromID
 // SHOULD NOT be included, but event with toID SHOULD be included. Argument
-// fromID can be nil if nil was passed to stream.Subscribe as last event ID, it
-// usually means client has connected to the SSE stream for the first time.
-// Argument toID can also be nil if nil was passed as lastID to New() function
-// and client have connected to the SSE stream before any events were published
-// using stream.Publish.
+// fromID can be empty string if empty string was passed to stream.Subscribe(),
+// it usually means client has connected to the SSE stream for the first time.
+// Argument toID can also be empty string if empty string was passed as initial
+// last event ID when stream was created and client have connected to the SSE
+// stream before any events were published using stream.Publish().
 //
 // ResyncFn should return all events in a given range in a slice. If the second
 // return variable err is not nil the subscription will disconnect with error.
 //
 // Correct implementation of this function is essential for proper client
 // resync and vital to whole SSE functionality.
-type ResyncFn func(topic string, fromID, toID interface{}) (events []Event, err error)
+type ResyncFn func(topic string, fromID, toID string) (events []Event, err error)
 
 // FilterFn is a callback function used to mutate event stream for individual
 // subscriptions. This function will be invoked for each event before sending it
