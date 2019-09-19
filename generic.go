@@ -76,8 +76,7 @@ func (s *GenericStream) SubscribeTopicFiltered(w http.ResponseWriter, topic stri
 			if len(events) > 0 {
 				return Respond(w, prependStream(events, nil), &s.cfg, s.responseStop)
 			}
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return nil
+			return err
 		}
 		if len(list) == 0 {
 			return Respond(w, prependStream(events, applyChanFilter(source, f)), &s.cfg, s.responseStop)

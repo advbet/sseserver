@@ -2,7 +2,6 @@ package sseserver
 
 import (
 	"errors"
-	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
@@ -20,7 +19,8 @@ func resyncGenerator(events []Event, err error) ResyncFn {
 }
 
 func TestGenericDisconnect(t *testing.T) {
-	stream := NewGeneric(resyncGenerator(nil, errors.New("error")), "first", Config{
+	resyncErr := errors.New("error")
+	stream := NewGeneric(resyncGenerator(nil, resyncErr), "first", Config{
 		Reconnect:             0,
 		KeepAlive:             0,
 		Lifetime:              10 * time.Millisecond,
@@ -30,8 +30,7 @@ func TestGenericDisconnect(t *testing.T) {
 	defer stream.Stop()
 
 	w := httptest.NewRecorder()
-	stream.Subscribe(w, "first")
-	assert.Equal(t, http.StatusInternalServerError, w.Code)
+	assert.Equal(t, resyncErr, stream.Subscribe(w, "first"))
 }
 
 func TestGenericResyncThreshold(t *testing.T) {
@@ -53,12 +52,13 @@ func TestGenericResyncThreshold(t *testing.T) {
 func TestGenericResyncBeforeDisconnect(t *testing.T) {
 	expected := []Event{{ID: "1"}, {ID: "2"}}
 	var synced bool
+	errSynced := errors.New("synced")
 	resync := func(topic string, fromID, toID string) ([]Event, error) {
 		if !synced {
 			synced = true
 			return expected, nil
 		}
-		return nil, errors.New("synced")
+		return nil, errSynced
 	}
 	stream := NewGeneric(resync, "first", Config{
 		Reconnect:             0,
@@ -71,13 +71,12 @@ func TestGenericResyncBeforeDisconnect(t *testing.T) {
 
 	// Get resynced events
 	w1 := httptest.NewRecorder()
-	stream.Subscribe(w1, "")
+	assert.Equal(t, nil, stream.Subscribe(w1, ""))
 	assertReceivedEvents(t, w1, expected...)
 
 	// Client reconnects after resync
 	w2 := httptest.NewRecorder()
-	stream.Subscribe(w2, "2")
-	assert.Equal(t, http.StatusInternalServerError, w2.Code)
+	assert.Equal(t, errSynced, stream.Subscribe(w2, "2"))
 }
 
 func TestGenericInitialLastEventID(t *testing.T) {
