@@ -40,3 +40,21 @@ func Example_cached() {
 	//   curl http://localhost:8000/
 	//   curl -H "Last-Event-ID: 5" http://localhost:8000/
 }
+
+func Example_cachedcount() {
+	stream := sseserver.NewCachedCount("", sseserver.DefaultConfig, 5)
+	go eventSource(stream)
+
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		id := r.Header.Get("Last-Event-ID")
+		if err := stream.Subscribe(w, id); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+	})
+
+	fmt.Println(http.ListenAndServe(":8000", nil))
+
+	// Test with:
+	//   curl http://localhost:8000/
+	//   curl -H "Last-Event-ID: 5" http://localhost:8000/
+}
