@@ -91,7 +91,7 @@ func (s *LastOnlyStream) SubscribeTopicFiltered(w http.ResponseWriter, topic str
 	s.RLock()
 	last := s.last[topic]
 	events := make([]Event, 0)
-	if len(last) > 0 && lastEventID != s.lastEventID {
+	if len(last) > 0 && (lastEventID != s.lastEventID || lastEventID == "") {
 		s := make([]string, 0)
 		for key := range last {
 			s = append(s, key)
