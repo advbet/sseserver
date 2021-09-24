@@ -186,24 +186,29 @@ func write(w io.Writer, e *Event) error {
 		return err
 	}
 
+	// We must ensure that two empty lines are used after writing the
+	// data.
 	switch data := e.Data.(type) {
 	case []byte:
 		if _, err := w.Write(data); err != nil {
 			return err
 		}
+
+		if _, err := fmt.Fprint(w, "\n"); err != nil {
+			return err
+		}
 	default:
+		// Here we rely on the fact that json encoder will add a single "\n" at
+		// the end of the JSON object.
 		if err := json.NewEncoder(w).Encode(e.Data); err != nil {
 			return err
 		}
 	}
 
-	// Here we rely on the fact that json encoder will add a single "\n" at
-	// the end of the JSON object. If json library is changed to include
-	// other separator or omit separator all-together two new-lines should
-	// be printed after data.
 	if _, err := fmt.Fprint(w, "\n"); err != nil {
 		return err
 	}
+
 	return nil
 }
 
