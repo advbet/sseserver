@@ -2,8 +2,9 @@
 //
 // This library provides a publish/subscribe interface for generating SSE
 // streams. It handles keep-alive messages, allows setting client reconnect
-// timeout, automatically disconnect long-lived connections. Message data are
-// always marshaled to JSON.
+// timeout, automatically disconnect long-lived connections. If provided
+// event message data is a slice of bytes it will be sent as is, however if it
+// is not a slice of bytes, the data will be marshaled using encoding/json.
 //
 // This library is targeted for advanced SSE server implementations that
 // supports client state resyncing after disconnect. Different client resync

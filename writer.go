@@ -185,9 +185,18 @@ func write(w io.Writer, e *Event) error {
 	if _, err := fmt.Fprint(w, "data: "); err != nil {
 		return err
 	}
-	if err := json.NewEncoder(w).Encode(e.Data); err != nil {
-		return err
+
+	switch data := e.Data.(type) {
+	case []byte:
+		if _, err := w.Write(data); err != nil {
+			return err
+		}
+	default:
+		if err := json.NewEncoder(w).Encode(e.Data); err != nil {
+			return err
+		}
 	}
+
 	// Here we rely on the fact that json encoder will add a single "\n" at
 	// the end of the JSON object. If json library is changed to include
 	// other separator or omit separator all-together two new-lines should
