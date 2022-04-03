@@ -102,21 +102,29 @@ func (s *CachedStream) SubscribeTopicFiltered(w http.ResponseWriter, topic strin
 	}
 
 	var events []Event
-	for {
+	for len(events) <= s.cfg.ResyncEventsThreshold {
 		eventIface, ok := s.cache.Get(topicIDKey(topic, lastClientID))
 		if !ok {
 			return ErrCacheMiss
 		}
 
 		event := eventIface.(*Event)
-		events = append(events, *event)
+		switch f {
+		case nil:
+			events = append(events, *event)
+		default:
+			if e := f(event); e != nil {
+				events = append(events, *e)
+			}
+		}
 
 		lastClientID = event.ID
 		if lastServerID == lastClientID {
-			break
+			return Respond(w, prependStream(events, applyChanFilter(source, f)), &s.cfg, s.responseStop)
 		}
 	}
-	return Respond(w, applyChanFilter(prependStream(events, source), f), &s.cfg, s.responseStop)
+
+	return Respond(w, prependStream(events, nil), &s.cfg, s.responseStop)
 }
 
 func (s *CachedStream) DropSubscribers() {

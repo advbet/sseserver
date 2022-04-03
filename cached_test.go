@@ -25,10 +25,11 @@ func assertReceivedEvents(t *testing.T, resp *httptest.ResponseRecorder, events 
 
 func TestCachedResync(t *testing.T) {
 	stream := NewCached("first", Config{
-		Reconnect:   0,
-		KeepAlive:   0,
-		Lifetime:    10 * time.Millisecond,
-		QueueLength: 32,
+		Reconnect:             0,
+		KeepAlive:             0,
+		Lifetime:              10 * time.Millisecond,
+		QueueLength:           32,
+		ResyncEventsThreshold: 2,
 	}, time.Minute, time.Minute)
 	defer stream.Stop()
 
@@ -48,10 +49,11 @@ func TestCachedResync(t *testing.T) {
 
 func TestCachedResyncWithBroadcast(t *testing.T) {
 	stream := NewCached("first", Config{
-		Reconnect:   0,
-		KeepAlive:   0,
-		Lifetime:    10 * time.Millisecond,
-		QueueLength: 32,
+		Reconnect:             0,
+		KeepAlive:             0,
+		Lifetime:              10 * time.Millisecond,
+		QueueLength:           32,
+		ResyncEventsThreshold: 2,
 	}, time.Minute, time.Minute)
 	defer stream.Stop()
 
@@ -91,10 +93,11 @@ func TestCachedResyncTopics(t *testing.T) {
 		"topic1": "first1",
 		"topic2": "first2",
 	}, Config{
-		Reconnect:   0,
-		KeepAlive:   0,
-		Lifetime:    10 * time.Millisecond,
-		QueueLength: 32,
+		Reconnect:             0,
+		KeepAlive:             0,
+		Lifetime:              10 * time.Millisecond,
+		QueueLength:           32,
+		ResyncEventsThreshold: 5,
 	}, time.Minute, time.Minute)
 	defer stream.Stop()
 
