@@ -102,32 +102,41 @@ func (c *cache) add(topic, id string, event *Event) {
 // is reached, the method returns collected events. If no events were found,
 // an empty slice is returned.
 func (c *cache) get(
-	topic, startID, maxID string,
+	topic, currentID, maxID string,
 	max int,
-) []*Event {
+	filter FilterFn,
+) ([]Event, bool) {
 
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
 	events, ok := c.items[topic]
 	if !ok {
-		return nil
+		return nil, true
 	}
 
-	var res []*Event
-
+	var res []Event
 	for {
-		event, ok := events[startID]
+		event, ok := events[currentID]
 		if !ok {
-			return res
+			return res, true
 		}
 
-		res = append(res, event)
+		switch filter {
+		case nil:
+			res = append(res, *event)
+		default:
+			filtered := filter(event)
+			if filtered != nil {
+				res = append(res, *filtered)
+			}
+		}
+
 		if len(res) == max || event.ID == maxID {
-			return res
+			return res, false
 		}
 
-		startID = event.ID
+		currentID = event.ID
 	}
 }
 
@@ -222,49 +231,31 @@ func (s *CachedStream) SubscribeTopic(w http.ResponseWriter, topic string, lastC
 	return s.SubscribeTopicFiltered(w, topic, lastClientID, nil)
 }
 
-func (s *CachedStream) SubscribeTopicFiltered(w http.ResponseWriter, topic string, lastClientID string, filterFn FilterFn) error {
+func (s *CachedStream) SubscribeTopicFiltered(w http.ResponseWriter, topic string, lastClientID string, filter FilterFn) error {
 	source := make(chan *Event, s.cfg.QueueLength)
 	lastServerID := s.broker.subscribe(topic, source)
 	defer s.broker.unsubscribe(source)
 
 	if lastClientID == "" || lastClientID == lastServerID {
 		// no resync needed
-		return Respond(w, applyChanFilter(source, filterFn), &s.cfg, s.responseStop)
+		return Respond(w, applyChanFilter(source, filter), &s.cfg, s.responseStop)
 	}
 
-	var events []Event
-	for len(events) <= s.cfg.ResyncEventsThreshold {
-		cacheEvents := s.cache.get(
-			topic,
-			lastClientID,
-			lastServerID,
-			s.cfg.ResyncEventsThreshold,
-		)
-		if len(cacheEvents) == 0 {
-			return ErrCacheMiss
-		}
-
-		switch filterFn {
-		case nil:
-			for _, event := range cacheEvents {
-				events = append(events, *event)
-			}
-		default:
-			for _, event := range cacheEvents {
-				if filtered := filterFn(event); filtered != nil {
-					events = append(events, *filtered)
-				}
-			}
-		}
-
-		lastClientID = cacheEvents[len(cacheEvents)-1].ID
-		if lastServerID == lastClientID {
-			return Respond(w, prependStream(events, applyChanFilter(source, filterFn)), &s.cfg, s.responseStop)
-		}
+	events, miss := s.cache.get(
+		topic,
+		lastClientID,
+		lastServerID,
+		s.cfg.ResyncEventsThreshold,
+		filter,
+	)
+	if miss {
+		// this can be deceiving as sometimes the client might be
+		// ahead of the server and in fact be too early.
+		return ErrCacheMiss
 	}
 
-	if len(events) > s.cfg.ResyncEventsThreshold {
-		events = events[:s.cfg.ResyncEventsThreshold]
+	if len(events) == 0 || lastServerID == events[len(events)-1].ID {
+		return Respond(w, prependStream(events, applyChanFilter(source, filter)), &s.cfg, s.responseStop)
 	}
 
 	return Respond(w, prependStream(events, nil), &s.cfg, s.responseStop)
