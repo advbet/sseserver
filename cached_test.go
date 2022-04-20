@@ -2,16 +2,74 @@ package sseserver
 
 import (
 	"bytes"
+	"fmt"
 	"net/http/httptest"
 	"strconv"
 	"testing"
 	"time"
 
+	gocache "github.com/patrickmn/go-cache"
 	"github.com/stretchr/testify/assert"
 )
 
 var _ MultiStream = &CachedStream{}
 var _ Stream = &CachedStream{}
+
+var (
+	topic          = "benchmark_topic"
+	localCache     = newCache(time.Minute, time.Minute)
+	patrickmnCache = gocache.New(time.Minute, time.Minute)
+)
+
+func init() {
+	for n := 0; n < 10000; n++ {
+		event := &Event{
+			ID: strconv.Itoa(n + 1),
+		}
+
+		localCache.add(topic, strconv.Itoa(n), event)
+		patrickmnCache.Add(fmt.Sprintf("%s%d", topic, n), event, gocache.DefaultExpiration)
+	}
+}
+
+func BenchmarkLocalCacheAdd(b *testing.B) {
+	for n := 0; n < b.N; n++ {
+		localCache.add(topic, strconv.Itoa(n-1), &Event{
+			ID: strconv.Itoa(n),
+		})
+	}
+}
+
+func BenchmarkPatrickmnCacheAdd(b *testing.B) {
+	for n := 0; n < b.N; n++ {
+		patrickmnCache.Add(fmt.Sprintf("%s%s", topic, strconv.Itoa(n-1)), &Event{
+			ID: strconv.Itoa(n),
+		}, gocache.DefaultExpiration)
+	}
+}
+
+func BenchmarkLocalCacheGet(b *testing.B) {
+	for n := 0; n < b.N; n++ {
+		events, _ := localCache.get(topic, "0", "5000", 5000, nil)
+		for range events {
+		}
+	}
+}
+
+func BenchmarkPatrickmnCacheGet(b *testing.B) {
+	for n := 0; n < b.N; n++ {
+		var events []*Event
+		for i := 0; i < 5000; i++ {
+			event, ok := patrickmnCache.Get(fmt.Sprintf("%s%d", topic, i))
+			if ok {
+				events = append(events, event.(*Event))
+			}
+		}
+
+		for range events {
+		}
+	}
+}
 
 func assertReceivedEvents(t *testing.T, resp *httptest.ResponseRecorder, events ...Event) {
 	var buf bytes.Buffer
