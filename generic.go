@@ -23,6 +23,12 @@ type GenericStream struct {
 // application was started, this value is passed to the resync function and
 // later replaced by the events published with stream.Publish method.
 func NewGeneric(resync ResyncFn, lastID string, cfg Config) *GenericStream {
+	return NewGenericMultiStream(resync, map[string]string{"": lastID}, cfg)
+}
+
+// NewGenericMultiStream is similar to NewGeneric but allows setting initial last
+// event ID values for multiple topics.
+func NewGenericMultiStream(resync ResyncFn, lastIDs map[string]string, cfg Config) *GenericStream {
 	s := &GenericStream{
 		broker:       newBroker(),
 		resync:       resync,
@@ -32,7 +38,7 @@ func NewGeneric(resync ResyncFn, lastID string, cfg Config) *GenericStream {
 	s.wg.Add(1)
 	go func() {
 		defer s.wg.Done()
-		s.broker.run(map[string]string{"": lastID})
+		s.broker.run(lastIDs)
 	}()
 	return s
 }
