@@ -28,21 +28,21 @@ func TestLastOnlyResync(t *testing.T) {
 
 	t.Run("no id", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		stream.Subscribe(w, "")
+		_ = stream.Subscribe(w, "")
 		// client should receive only last event
 		assertReceivedEvents(t, w, event2)
 	})
 
 	t.Run("id old", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		stream.Subscribe(w, "16")
+		_ = stream.Subscribe(w, "16")
 		// client should receive only last event
 		assertReceivedEvents(t, w, event2)
 	})
 
 	t.Run("id up to date", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		stream.Subscribe(w, "32")
+		_ = stream.Subscribe(w, "32")
 		// connect with up to date last event ID,
 		// should not generate duplicate events.
 		assertReceivedEvents(t, w)
@@ -66,13 +66,13 @@ func TestLastOnlyTopics(t *testing.T) {
 
 	t.Run("with topic1", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		stream.SubscribeTopic(w, "topic1", "")
+		_ = stream.SubscribeTopic(w, "topic1", "")
 		assertReceivedEvents(t, w, event1)
 	})
 
 	t.Run("with topic2", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		stream.SubscribeTopic(w, "topic2", "")
+		_ = stream.SubscribeTopic(w, "topic2", "")
 		assertReceivedEvents(t, w, event2)
 	})
 }
@@ -97,13 +97,13 @@ func TestLastPerTopic(t *testing.T) {
 
 	t.Run("receive ids 1 and 3", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		stream.SubscribeTopic(w, "topic1", "")
+		_ = stream.SubscribeTopic(w, "topic1", "")
 		assertReceivedEvents(t, w, event1, event2v2)
 	})
 
 	t.Run("receive none", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		stream.SubscribeTopic(w, "topic1", "3")
+		_ = stream.SubscribeTopic(w, "topic1", "3")
 		assertReceivedEvents(t, w)
 	})
 }

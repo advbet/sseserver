@@ -56,7 +56,7 @@ func TestRespondContentType(t *testing.T) {
 	close(source)
 
 	w := recordResponse(t, source, &Config{}, nil)
-	contentType := w.HeaderMap.Get("Content-Type")
+	contentType := w.Header().Get("Content-Type")
 	assert.Equal(t, "text/event-stream; charset=utf-8", contentType, "Content-Type header is missing or invalid")
 }
 
