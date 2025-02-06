@@ -22,7 +22,7 @@ type Config struct {
 	// KeepAlive sets how often SSE stream should include a dummy keep alive
 	// message. Setting KeepAlive to zero disables sending keep alive
 	// messages. It is recommended to keep this value lower than 60 seconds
-	// if nginx proxy is used. By default nginx will timeout the request if
+	// if nginx proxy is used. By default, nginx will timeout the request if
 	// there is more than 60 seconds gap between two successive reads.
 	KeepAlive time.Duration
 
@@ -70,7 +70,7 @@ func drain(source <-chan *Event) {
 	}()
 }
 
-// Respond reads Events from a channel and writes SSE HTTP reponse. function
+// Respond reads Events from a channel and writes SSE HTTP response. function
 // provides a lower level API that allows manually generating SSE stream. In
 // most cases this function should not be used directly.
 //
@@ -78,12 +78,12 @@ func drain(source <-chan *Event) {
 // DefaultConfiguration global will be used.
 //
 // Stop is an optional channel for stopping SSE stream, if this channel is
-// closed SSE stream will stopped and http connection closed. If stream stopping
+// closed SSE stream will stop and http connection closed. If stream stopping
 // functionality is not required Stop should be set to nil.
 //
 // This function returns nil if end of stream is reached, stream lifetime
 // expired, client closes the connection or request to stop is received on the
-// stop channel. Otherwise it returns an error.
+// stop channel. Otherwise, it returns an error.
 //
 // Note! After passing source channel to Stream it cannot be reused (for example
 // passed to the Stream function again). This function will drain source channel
@@ -105,6 +105,7 @@ func Respond(w http.ResponseWriter, source <-chan *Event, cfg *Config, stop <-ch
 	}
 
 	var closeChan <-chan bool
+	//nolint:staticcheck
 	if notifier, ok := w.(http.CloseNotifier); ok {
 		closeChan = notifier.CloseNotify()
 	}

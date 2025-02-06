@@ -45,7 +45,7 @@ func TestGenericResyncThreshold(t *testing.T) {
 	defer stream.Stop()
 
 	w := httptest.NewRecorder()
-	stream.Subscribe(w, "")
+	_ = stream.Subscribe(w, "")
 	assertReceivedEvents(t, w, expected...)
 }
 
@@ -96,7 +96,7 @@ func TestGenericInitialLastEventID(t *testing.T) {
 	defer stream.Stop()
 
 	w := httptest.NewRecorder()
-	stream.Subscribe(w, "")
+	_ = stream.Subscribe(w, "")
 	assertReceivedEvents(t, w)
 	assert.Equal(t, initialID, actualID)
 }
@@ -118,7 +118,7 @@ func TestGenericResyncTopic(t *testing.T) {
 	defer stream.Stop()
 
 	w := httptest.NewRecorder()
-	stream.SubscribeTopic(w, topic, "0")
+	_ = stream.SubscribeTopic(w, topic, "0")
 	assertReceivedEvents(t, w)
 	assert.Equal(t, topic, receivedTopic, "resync function received another topic")
 }

@@ -29,7 +29,7 @@ func TestCachedCountResync(t *testing.T) {
 
 	w := httptest.NewRecorder()
 	// connect with initial last event ID to receive both cached events
-	stream.Subscribe(w, "first")
+	_ = stream.Subscribe(w, "first")
 
 	// Assert both events were received
 	assertReceivedEvents(t, w, event1, event2)
@@ -62,7 +62,7 @@ func TestCachedCountResyncWithBroadcast(t *testing.T) {
 	w := httptest.NewRecorder()
 	// connect with initial last event ID to receive both cached events,
 	// broadcasted event should be excluded
-	stream.Subscribe(w, "first")
+	_ = stream.Subscribe(w, "first")
 
 	// Assert both events were received
 	assertReceivedEvents(t, w, event1, event2)
@@ -109,12 +109,12 @@ func TestCachedCountResyncTopics(t *testing.T) {
 
 	t.Run("with topic1", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		stream.SubscribeTopic(w, "topic1", "first1")
+		_ = stream.SubscribeTopic(w, "topic1", "first1")
 		assertReceivedEvents(t, w, events1...)
 	})
 	t.Run("with topic2", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		stream.SubscribeTopic(w, "topic2", "first2")
+		_ = stream.SubscribeTopic(w, "topic2", "first2")
 		assertReceivedEvents(t, w, events2...)
 	})
 }

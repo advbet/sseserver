@@ -28,7 +28,7 @@ func init() {
 		}
 
 		localCache.add(topic, strconv.Itoa(n), event)
-		patrickmnCache.Add(fmt.Sprintf("%s%d", topic, n), event, gocache.DefaultExpiration)
+		_ = patrickmnCache.Add(fmt.Sprintf("%s%d", topic, n), event, gocache.DefaultExpiration)
 	}
 }
 
@@ -42,7 +42,7 @@ func BenchmarkLocalCacheAdd(b *testing.B) {
 
 func BenchmarkPatrickmnCacheAdd(b *testing.B) {
 	for n := 0; n < b.N; n++ {
-		patrickmnCache.Add(fmt.Sprintf("%s%s", topic, strconv.Itoa(n-1)), &Event{
+		_ = patrickmnCache.Add(fmt.Sprintf("%s%s", topic, strconv.Itoa(n-1)), &Event{
 			ID: strconv.Itoa(n),
 		}, gocache.DefaultExpiration)
 	}
@@ -75,7 +75,7 @@ func assertReceivedEvents(t *testing.T, resp *httptest.ResponseRecorder, events 
 	var buf bytes.Buffer
 
 	for _, event := range events {
-		write(&buf, &event)
+		_ = write(&buf, &event)
 	}
 
 	assert.Equal(t, buf.String(), resp.Body.String())
@@ -99,7 +99,7 @@ func TestCachedResync(t *testing.T) {
 
 	w := httptest.NewRecorder()
 	// connect with initial last event ID to receive both cached events
-	stream.Subscribe(w, "first")
+	_ = stream.Subscribe(w, "first")
 
 	// Assert both events were received
 	assertReceivedEvents(t, w, event1, event2)
@@ -125,7 +125,7 @@ func TestCachedResyncWithBroadcast(t *testing.T) {
 	w := httptest.NewRecorder()
 	// connect with initial last event ID to receive both cached events,
 	// broadcasted event should be excluded
-	stream.Subscribe(w, "first")
+	_ = stream.Subscribe(w, "first")
 
 	// Assert both events were received
 	assertReceivedEvents(t, w, event1, event2)
@@ -173,12 +173,12 @@ func TestCachedResyncTopics(t *testing.T) {
 
 	t.Run("with topic1", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		stream.SubscribeTopic(w, "topic1", "first1")
+		_ = stream.SubscribeTopic(w, "topic1", "first1")
 		assertReceivedEvents(t, w, events1...)
 	})
 	t.Run("with topic2", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		stream.SubscribeTopic(w, "topic2", "first2")
+		_ = stream.SubscribeTopic(w, "topic2", "first2")
 		assertReceivedEvents(t, w, events2...)
 	})
 }
