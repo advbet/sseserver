@@ -5,10 +5,9 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"testing"
 	"time"
-
-	"github.com/stretchr/testify/assert"
 )
 
 type writerNotFlusher struct{}
@@ -20,16 +19,22 @@ func (w writerNotFlusher) WriteHeader(int)           {}
 func recordResponse(t *testing.T, source <-chan *Event, c *Config, stop <-chan struct{}) *httptest.ResponseRecorder {
 	w := httptest.NewRecorder()
 	err := Respond(w, source, c, stop)
-	assert.Nil(t, err)
+	if err != nil {
+		t.Errorf("Expected nil error, got %v", err)
+	}
 	return w
 }
 
 func TestRespondWithoutFlusher(t *testing.T) {
 	var w writerNotFlusher
 
-	assert.Panics(t, func() {
-		_ = Respond(w, make(<-chan *Event), nil, nil)
-	})
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("Expected panic when using non-flusher writer, but no panic occurred")
+		}
+	}()
+
+	_ = Respond(w, make(<-chan *Event), nil, nil)
 }
 
 func TestRespondReconnect(t *testing.T) {
@@ -41,13 +46,17 @@ func TestRespondReconnect(t *testing.T) {
 	w := recordResponse(t, source, &Config{
 		Reconnect: 99 * time.Millisecond,
 	}, nil)
-	assert.True(t, bytes.Contains(w.Body.Bytes(), []byte("retry: 99\n")))
+	if !bytes.Contains(w.Body.Bytes(), []byte("retry: 99\n")) {
+		t.Error("Expected response to contain 'retry: 99\\n', but it doesn't")
+	}
 
-	// Check if retry: is ommited
+	// Check if retry: is omitted
 	w = recordResponse(t, source, &Config{
 		Reconnect: 0 * time.Millisecond,
 	}, nil)
-	assert.False(t, bytes.Contains(w.Body.Bytes(), []byte("retry:")))
+	if bytes.Contains(w.Body.Bytes(), []byte("retry:")) {
+		t.Error("Expected response not to contain 'retry:', but it does")
+	}
 }
 
 func TestRespondContentType(t *testing.T) {
@@ -57,7 +66,10 @@ func TestRespondContentType(t *testing.T) {
 
 	w := recordResponse(t, source, &Config{}, nil)
 	contentType := w.Header().Get("Content-Type")
-	assert.Equal(t, "text/event-stream; charset=utf-8", contentType, "Content-Type header is missing or invalid")
+	expected := "text/event-stream; charset=utf-8"
+	if contentType != expected {
+		t.Errorf("Content-Type header is missing or invalid, expected %q, got %q", expected, contentType)
+	}
 }
 
 func TestRespondTimeout(t *testing.T) {
@@ -72,18 +84,22 @@ func TestRespondTimeout(t *testing.T) {
 	}, nil)
 	end := time.Now()
 
-	assert.WithinDuration(t, start, end, lifetime*2)
+	if duration := end.Sub(start); duration > lifetime*2 {
+		t.Errorf("Response took too long, expected under %v, got %v", lifetime*2, duration)
+	}
 }
 
 func TestRespondKeepAlive(t *testing.T) {
 	source := make(chan *Event)
-	// Close source after 50 miliseconds
+	// Close source after 50 milliseconds
 	time.AfterFunc(50*time.Millisecond, func() { close(source) })
 
 	w := recordResponse(t, source, &Config{
 		KeepAlive: 30 * time.Millisecond,
 	}, nil)
-	assert.True(t, bytes.Contains(w.Body.Bytes(), []byte(":keep-alive\n")))
+	if !bytes.Contains(w.Body.Bytes(), []byte(":keep-alive\n")) {
+		t.Error("Expected response to contain ':keep-alive\\n', but it doesn't")
+	}
 }
 
 func TestRespondStop(t *testing.T) {
@@ -98,7 +114,10 @@ func TestRespondStop(t *testing.T) {
 	start := time.Now()
 	recordResponse(t, source, &Config{}, stop)
 	end := time.Now()
-	assert.WithinDuration(t, start, end, stopTimeout*2)
+
+	if duration := end.Sub(start); duration > stopTimeout*2 {
+		t.Errorf("Response took too long, expected under %v, got %v", stopTimeout*2, duration)
+	}
 }
 
 func TestRespondWrite(t *testing.T) {
@@ -113,7 +132,9 @@ func TestRespondWrite(t *testing.T) {
 	close(source)
 
 	w := recordResponse(t, source, &Config{}, nil)
-	assert.Equal(t, expected, w.Body.Bytes())
+	if !bytes.Equal(expected, w.Body.Bytes()) {
+		t.Errorf("Unexpected response body\nexpected: %q\ngot: %q", expected, w.Body.Bytes())
+	}
 }
 
 type customResponseRecorder struct {
@@ -136,7 +157,9 @@ func TestRespondCloseNotify(t *testing.T) {
 	_ = Respond(w, source, &Config{}, nil)
 	end := time.Now()
 
-	assert.WithinDuration(t, start, end, closeTimeout*2)
+	if duration := end.Sub(start); duration > closeTimeout*2 {
+		t.Errorf("Response took too long, expected under %v, got %v", closeTimeout*2, duration)
+	}
 }
 
 func TestApplyFilter(t *testing.T) {
@@ -187,7 +210,10 @@ func TestApplyFilter(t *testing.T) {
 			for e := range applyChanFilter(in, test.filter) {
 				output = append(output, e)
 			}
-			assert.Equal(t, test.output, output)
+
+			if !reflect.DeepEqual(test.output, output) {
+				t.Errorf("Expected %+v, got %+v", test.output, output)
+			}
 		})
 	}
 }

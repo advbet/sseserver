@@ -1,11 +1,10 @@
 package sseserver
 
 import (
+	"errors"
 	"net/http/httptest"
 	"testing"
 	"time"
-
-	"github.com/stretchr/testify/assert"
 )
 
 var _ Stream = &LastOnlyStream{}
@@ -120,11 +119,17 @@ func TestFilterSupport(t *testing.T) {
 	f := FilterFn(func(e *Event) *Event { return nil })
 	t.Run("with filter should error", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		assert.Equal(t, stream.SubscribeTopicFiltered(w, "topic1", "", f), errFiltersNotSupported)
+		err := stream.SubscribeTopicFiltered(w, "topic1", "", f)
+		if !errors.Is(err, errFiltersNotSupported) {
+			t.Errorf("Expected error %v, got %v", errFiltersNotSupported, err)
+		}
 	})
 
 	t.Run("without filter should not error", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		assert.Equal(t, stream.SubscribeTopicFiltered(w, "topic1", "", nil), nil)
+		err := stream.SubscribeTopicFiltered(w, "topic1", "", nil)
+		if err != nil {
+			t.Errorf("Expected nil error, got %v", err)
+		}
 	})
 }

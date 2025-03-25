@@ -5,8 +5,6 @@ import (
 	"net/http/httptest"
 	"testing"
 	"time"
-
-	"github.com/stretchr/testify/assert"
 )
 
 var _ Stream = &GenericStream{}
@@ -30,7 +28,11 @@ func TestGenericDisconnect(t *testing.T) {
 	defer stream.Stop()
 
 	w := httptest.NewRecorder()
-	assert.Equal(t, resyncErr, stream.Subscribe(w, "first"))
+	err := stream.Subscribe(w, "first")
+
+	if !errors.Is(err, resyncErr) {
+		t.Errorf("Expected error %v, got %v", resyncErr, err)
+	}
 }
 
 func TestGenericResyncThreshold(t *testing.T) {
@@ -71,18 +73,24 @@ func TestGenericResyncBeforeDisconnect(t *testing.T) {
 
 	// Get resynced events
 	w1 := httptest.NewRecorder()
-	assert.Equal(t, nil, stream.Subscribe(w1, ""))
+	err1 := stream.Subscribe(w1, "")
+	if err1 != nil {
+		t.Errorf("Expected nil error, got %v", err1)
+	}
 	assertReceivedEvents(t, w1, expected...)
 
 	// Client reconnects after resync
 	w2 := httptest.NewRecorder()
-	assert.Equal(t, errSynced, stream.Subscribe(w2, "2"))
+	err2 := stream.Subscribe(w2, "2")
+	if !errors.Is(err2, errSynced) {
+		t.Errorf("Expected error %v, got %v", errSynced, err2)
+	}
 }
 
 func TestGenericInitialLastEventID(t *testing.T) {
 	initialID := "15"
 	var actualID string
-	resync := func(topcic string, fromID, toID string) ([]Event, error) {
+	resync := func(topic string, fromID, toID string) ([]Event, error) {
 		actualID = toID
 		return nil, nil
 	}
@@ -98,7 +106,9 @@ func TestGenericInitialLastEventID(t *testing.T) {
 	w := httptest.NewRecorder()
 	_ = stream.Subscribe(w, "")
 	assertReceivedEvents(t, w)
-	assert.Equal(t, initialID, actualID)
+	if actualID != initialID {
+		t.Errorf("Expected ID %s, got %s", initialID, actualID)
+	}
 }
 
 func TestGenericResyncTopic(t *testing.T) {
@@ -120,7 +130,9 @@ func TestGenericResyncTopic(t *testing.T) {
 	w := httptest.NewRecorder()
 	_ = stream.SubscribeTopic(w, topic, "0")
 	assertReceivedEvents(t, w)
-	assert.Equal(t, topic, receivedTopic, "resync function received another topic")
+	if receivedTopic != topic {
+		t.Errorf("resync function received wrong topic: expected %s, got %s", topic, receivedTopic)
+	}
 }
 
 func TestPrependStream(t *testing.T) {
@@ -143,15 +155,21 @@ func TestPrependStream(t *testing.T) {
 
 	combined := prependStream(events, stream)
 	// Check if combined stream contains expected list of events
-	for _, event := range expected {
+	for i, event := range expected {
 		e, ok := <-combined
-		assert.True(t, ok)
-		assert.Equal(t, event, *e)
+		if !ok {
+			t.Fatalf("combined stream closed too early at index %d", i)
+		}
+		if e.ID != event.ID {
+			t.Errorf("expected event ID %s at index %d, got %s", event.ID, i, e.ID)
+		}
 	}
 
-	// Check if stream is closed afterwards
+	// Check if stream is closed afterward
 	_, ok := <-combined
-	assert.False(t, ok)
+	if ok {
+		t.Error("combined stream should be closed but isn't")
+	}
 }
 
 // TestPrependStreamStatic checks if prependStream works correctly if nil is
@@ -164,13 +182,19 @@ func TestPrependStreamStatic(t *testing.T) {
 
 	combined := prependStream(events, nil)
 	// Check if combined stream contains expected list of events
-	for _, event := range events {
+	for i, event := range events {
 		e, ok := <-combined
-		assert.True(t, ok)
-		assert.Equal(t, event, *e)
+		if !ok {
+			t.Fatalf("combined stream closed too early at index %d", i)
+		}
+		if e.ID != event.ID {
+			t.Errorf("expected event ID %s at index %d, got %s", event.ID, i, e.ID)
+		}
 	}
 
 	// Check if stream is closed afterwards
 	_, ok := <-combined
-	assert.False(t, ok)
+	if ok {
+		t.Error("combined stream should be closed but isn't")
+	}
 }

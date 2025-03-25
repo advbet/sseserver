@@ -2,6 +2,7 @@ package sseserver
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"net/http/httptest"
 	"strconv"
@@ -9,7 +10,6 @@ import (
 	"time"
 
 	gocache "github.com/patrickmn/go-cache"
-	"github.com/stretchr/testify/assert"
 )
 
 var _ MultiStream = &CachedStream{}
@@ -73,12 +73,13 @@ func BenchmarkPatrickmnCacheGet(b *testing.B) {
 
 func assertReceivedEvents(t *testing.T, resp *httptest.ResponseRecorder, events ...Event) {
 	var buf bytes.Buffer
-
 	for _, event := range events {
 		_ = write(&buf, &event)
 	}
 
-	assert.Equal(t, buf.String(), resp.Body.String())
+	if buf.String() != resp.Body.String() {
+		t.Errorf("Expected response body: %q, got: %q", buf.String(), resp.Body.String())
+	}
 }
 
 func TestCachedResync(t *testing.T) {
@@ -141,9 +142,11 @@ func TestCachedError(t *testing.T) {
 	defer stream.Stop()
 
 	w := httptest.NewRecorder()
-	// resyncing from non existant event ID should return error
-	err := stream.Subscribe(w, "non exitant")
-	assert.Equal(t, ErrCacheMiss, err)
+	// resyncing from non-existent event ID should return error
+	err := stream.Subscribe(w, "non-existent")
+	if !errors.Is(err, ErrCacheMiss) {
+		t.Errorf("Expected error: %v, got: %v", ErrCacheMiss, err)
+	}
 }
 
 func TestCachedResyncTopics(t *testing.T) {

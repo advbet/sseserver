@@ -3,8 +3,6 @@ package sseserver
 import (
 	"strconv"
 	"testing"
-
-	"github.com/stretchr/testify/assert"
 )
 
 // TestBorkerLastID checks if subscribing to broker correctly returns last
@@ -14,15 +12,24 @@ func TestBrokerLastID(t *testing.T) {
 	defer close(broker)
 	go broker.run(map[string]string{"": "123"})
 
-	// Before any publishings last ID should be the same as given when
+	// Before any publishing's last ID should be the same as given when
 	// starting broker goroutine
-	assert.Equal(t, "123", broker.subscribe("", make(chan *Event)))
+	lastID := broker.subscribe("", make(chan *Event))
+	if lastID != "123" {
+		t.Errorf("expected lastID to be '123', got '%s'", lastID)
+	}
 
 	broker.publish("", &Event{ID: "1"}, nil)
-	assert.Equal(t, "1", broker.subscribe("", make(chan *Event)))
+	lastID = broker.subscribe("", make(chan *Event))
+	if lastID != "1" {
+		t.Errorf("expected lastID to be '1', got '%s'", lastID)
+	}
 
 	broker.publish("", &Event{ID: "2"}, nil)
-	assert.Equal(t, "2", broker.subscribe("", make(chan *Event)))
+	lastID = broker.subscribe("", make(chan *Event))
+	if lastID != "2" {
+		t.Errorf("expected lastID to be '2', got '%s'", lastID)
+	}
 }
 
 // TestBorkerLastIDTopics checks if using multiple topics does track event IDs
@@ -35,20 +42,41 @@ func TestBrokerLastIDTopics(t *testing.T) {
 		"topic2": "456",
 	})
 
-	// Before any publishings last ID should be the same as given when
+	// Before any publishing's last ID should be the same as given when
 	// starting broker goroutine
-	assert.Equal(t, "123", broker.subscribe("topic1", make(chan *Event)))
-	assert.Equal(t, "456", broker.subscribe("topic2", make(chan *Event)))
+	lastID := broker.subscribe("topic1", make(chan *Event))
+	if lastID != "123" {
+		t.Errorf("expected lastID for topic1 to be '123', got '%s'", lastID)
+	}
+
+	lastID = broker.subscribe("topic2", make(chan *Event))
+	if lastID != "456" {
+		t.Errorf("expected lastID for topic2 to be '456', got '%s'", lastID)
+	}
 
 	// Publish on topic1
 	broker.publish("topic1", &Event{ID: "1"}, nil)
-	assert.Equal(t, "1", broker.subscribe("topic1", make(chan *Event)))
-	assert.Equal(t, "456", broker.subscribe("topic2", make(chan *Event)))
+	lastID = broker.subscribe("topic1", make(chan *Event))
+	if lastID != "1" {
+		t.Errorf("expected lastID for topic1 to be '1', got '%s'", lastID)
+	}
+
+	lastID = broker.subscribe("topic2", make(chan *Event))
+	if lastID != "456" {
+		t.Errorf("expected lastID for topic2 to be '456', got '%s'", lastID)
+	}
 
 	// Publish on topic2
 	broker.publish("topic2", &Event{ID: "2"}, nil)
-	assert.Equal(t, "1", broker.subscribe("topic1", make(chan *Event)))
-	assert.Equal(t, "2", broker.subscribe("topic2", make(chan *Event)))
+	lastID = broker.subscribe("topic1", make(chan *Event))
+	if lastID != "1" {
+		t.Errorf("expected lastID for topic1 to be '1', got '%s'", lastID)
+	}
+
+	lastID = broker.subscribe("topic2", make(chan *Event))
+	if lastID != "2" {
+		t.Errorf("expected lastID for topic2 to be '2', got '%s'", lastID)
+	}
 }
 
 // TestBrokerStop cheks if closing broker closes all subscribers.
@@ -63,7 +91,9 @@ func TestBrokerStop(t *testing.T) {
 
 	// reading from closed channel should fail
 	_, ok := <-client
-	assert.False(t, ok)
+	if ok {
+		t.Error("expected client channel to be closed, but it was still open")
+	}
 }
 
 // TestBrokerPublish cheks if published event is broadcasted to all of the
@@ -88,10 +118,15 @@ func TestBrokerPublish(t *testing.T) {
 	broker.publish("", event, nil)
 
 	// check if all clients received it
-	for _, client := range clients {
+	for i, client := range clients {
 		e, ok := <-client
-		assert.True(t, ok)
-		assert.Equal(t, event, e)
+		if !ok {
+			t.Errorf("client %d: channel unexpectedly closed", i)
+			continue
+		}
+		if e.ID != event.ID || e.Event != event.Event || e.Data != event.Data {
+			t.Errorf("client %d: expected event %+v, got %+v", i, event, e)
+		}
 	}
 }
 
@@ -121,15 +156,26 @@ func TestBrokerPublishTopics(t *testing.T) {
 	broker.publish("topic2", event2, nil)
 
 	// check if all clients received it
-	for _, client := range clients1 {
+	for i, client := range clients1 {
 		e, ok := <-client
-		assert.True(t, ok)
-		assert.Equal(t, event1, e)
+		if !ok {
+			t.Errorf("topic1 client %d: channel unexpectedly closed", i)
+			continue
+		}
+		if e.ID != event1.ID || e.Event != event1.Event || e.Data != event1.Data {
+			t.Errorf("topic1 client %d: expected event %+v, got %+v", i, event1, e)
+		}
 	}
-	for _, client := range clients2 {
+
+	for i, client := range clients2 {
 		e, ok := <-client
-		assert.True(t, ok)
-		assert.Equal(t, event2, e)
+		if !ok {
+			t.Errorf("topic2 client %d: channel unexpectedly closed", i)
+			continue
+		}
+		if e.ID != event2.ID || e.Event != event2.Event || e.Data != event2.Data {
+			t.Errorf("topic2 client %d: expected event %+v, got %+v", i, event2, e)
+		}
 	}
 }
 
@@ -151,17 +197,24 @@ func TestBrokerPublishFull(t *testing.T) {
 	}
 
 	// Drain event from the client buffer, check if events are received in
-	// oder
+	// order
 	for i := 0; i < cap(client); i++ {
 		e, ok := <-client
-		assert.True(t, ok)
-		assert.Equal(t, &Event{ID: strconv.Itoa(i)}, e)
+		if !ok {
+			t.Fatalf("client channel closed prematurely at iteration %d", i)
+		}
+		expectedID := strconv.Itoa(i)
+		if e.ID != expectedID {
+			t.Errorf("expected event ID %s, got %s", expectedID, e.ID)
+		}
 	}
 
 	// Assert that broker have not buffered any overflowed events and closed
 	// client channel
 	_, ok := <-client
-	assert.False(t, ok)
+	if ok {
+		t.Error("expected client channel to be closed, but it was still open")
+	}
 }
 
 // TestBrokerUnsubscribe checks if unsubscribing from broker does not receive
@@ -184,10 +237,12 @@ func TestBrokerUnsubscribe(t *testing.T) {
 	// assert client channel is closed and have not received the second
 	// event
 	_, ok := <-client
-	assert.False(t, ok)
+	if ok {
+		t.Error("expected client channel to be closed, but it was still open")
+	}
 }
 
-func TestBorkerBroadcast(t *testing.T) {
+func TestBrokerBroadcast(t *testing.T) {
 	broker := newBroker()
 	defer close(broker)
 	go broker.run(nil)
@@ -208,14 +263,25 @@ func TestBorkerBroadcast(t *testing.T) {
 	broker.broadcast(event)
 
 	// check if all clients received it
-	for _, client := range clients1 {
+	for i, client := range clients1 {
 		e, ok := <-client
-		assert.True(t, ok)
-		assert.Equal(t, event, e)
+		if !ok {
+			t.Errorf("topic1 client %d: channel unexpectedly closed", i)
+			continue
+		}
+		if e.ID != event.ID || e.Event != event.Event || e.Data != event.Data {
+			t.Errorf("topic1 client %d: expected event %+v, got %+v", i, event, e)
+		}
 	}
-	for _, client := range clients2 {
+
+	for i, client := range clients2 {
 		e, ok := <-client
-		assert.True(t, ok)
-		assert.Equal(t, event, e)
+		if !ok {
+			t.Errorf("topic2 client %d: channel unexpectedly closed", i)
+			continue
+		}
+		if e.ID != event.ID || e.Event != event.Event || e.Data != event.Data {
+			t.Errorf("topic2 client %d: expected event %+v, got %+v", i, event, e)
+		}
 	}
 }
