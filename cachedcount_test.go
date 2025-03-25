@@ -1,12 +1,11 @@
 package sseserver
 
 import (
+	"errors"
 	"net/http/httptest"
 	"strconv"
 	"testing"
 	"time"
-
-	"github.com/stretchr/testify/assert"
 )
 
 var _ MultiStream = &CachedCountStream{}
@@ -40,7 +39,9 @@ func TestCachedCountResync(t *testing.T) {
 	w = httptest.NewRecorder()
 	// cache size limit passed
 	err := stream.Subscribe(w, "first")
-	assert.Equal(t, ErrCacheMiss, err)
+	if !errors.Is(err, ErrCacheMiss) {
+		t.Errorf("Expected error: %v, got: %v", ErrCacheMiss, err)
+	}
 }
 
 func TestCachedCountResyncWithBroadcast(t *testing.T) {
@@ -80,7 +81,9 @@ func TestCachedCountError(t *testing.T) {
 	w := httptest.NewRecorder()
 	// resyncing from non existant event ID should return error
 	err := stream.Subscribe(w, "non exitant")
-	assert.Equal(t, ErrCacheMiss, err)
+	if !errors.Is(err, ErrCacheMiss) {
+		t.Errorf("Expected error: %v, got: %v", ErrCacheMiss, err)
+	}
 }
 
 func TestCachedCountResyncTopics(t *testing.T) {

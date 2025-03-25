@@ -2,33 +2,32 @@ package sseserver
 
 import (
 	"bytes"
-	"fmt"
+	"errors"
+	"io"
+	"log/slog"
 	"net/http/httptest"
 	"strconv"
 	"testing"
 	"time"
-
-	gocache "github.com/patrickmn/go-cache"
-	"github.com/stretchr/testify/assert"
 )
 
 var _ MultiStream = &CachedStream{}
 var _ Stream = &CachedStream{}
 
 var (
-	topic          = "benchmark_topic"
-	localCache     = newCache(time.Minute, time.Minute)
-	patrickmnCache = gocache.New(time.Minute, time.Minute)
+	topic      = "benchmark_topic"
+	localCache = newCache(time.Minute, time.Minute)
 )
 
 func init() {
+	slog.SetDefault(slog.New(slog.NewTextHandler(io.Discard, nil)))
+
 	for n := 0; n < 10000; n++ {
 		event := &Event{
 			ID: strconv.Itoa(n + 1),
 		}
 
 		localCache.add(topic, strconv.Itoa(n), event)
-		_ = patrickmnCache.Add(fmt.Sprintf("%s%d", topic, n), event, gocache.DefaultExpiration)
 	}
 }
 
@@ -40,14 +39,6 @@ func BenchmarkLocalCacheAdd(b *testing.B) {
 	}
 }
 
-func BenchmarkPatrickmnCacheAdd(b *testing.B) {
-	for n := 0; n < b.N; n++ {
-		_ = patrickmnCache.Add(fmt.Sprintf("%s%s", topic, strconv.Itoa(n-1)), &Event{
-			ID: strconv.Itoa(n),
-		}, gocache.DefaultExpiration)
-	}
-}
-
 func BenchmarkLocalCacheGet(b *testing.B) {
 	for n := 0; n < b.N; n++ {
 		events, _ := localCache.get(topic, "0", "5000", 5000, nil)
@@ -56,29 +47,15 @@ func BenchmarkLocalCacheGet(b *testing.B) {
 	}
 }
 
-func BenchmarkPatrickmnCacheGet(b *testing.B) {
-	for n := 0; n < b.N; n++ {
-		var events []*Event
-		for i := 0; i < 5000; i++ {
-			event, ok := patrickmnCache.Get(fmt.Sprintf("%s%d", topic, i))
-			if ok {
-				events = append(events, event.(*Event))
-			}
-		}
-
-		for range events {
-		}
-	}
-}
-
 func assertReceivedEvents(t *testing.T, resp *httptest.ResponseRecorder, events ...Event) {
 	var buf bytes.Buffer
-
 	for _, event := range events {
 		_ = write(&buf, &event)
 	}
 
-	assert.Equal(t, buf.String(), resp.Body.String())
+	if buf.String() != resp.Body.String() {
+		t.Errorf("Expected response body: %q, got: %q", buf.String(), resp.Body.String())
+	}
 }
 
 func TestCachedResync(t *testing.T) {
@@ -141,9 +118,11 @@ func TestCachedError(t *testing.T) {
 	defer stream.Stop()
 
 	w := httptest.NewRecorder()
-	// resyncing from non existant event ID should return error
-	err := stream.Subscribe(w, "non exitant")
-	assert.Equal(t, ErrCacheMiss, err)
+	// resyncing from non-existent event ID should return error
+	err := stream.Subscribe(w, "non-existent")
+	if !errors.Is(err, ErrCacheMiss) {
+		t.Errorf("Expected error: %v, got: %v", ErrCacheMiss, err)
+	}
 }
 
 func TestCachedResyncTopics(t *testing.T) {

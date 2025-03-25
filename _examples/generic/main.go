@@ -1,4 +1,4 @@
-package sseserver_test
+package main
 
 import (
 	"fmt"
@@ -32,6 +32,7 @@ func lookupEvents(topic string, fromStr string, toStr string) ([]sseserver.Event
 	if err != nil {
 		return nil, err
 	}
+
 	to, err := strconv.Atoi(toStr)
 	if err != nil {
 		return nil, err
@@ -43,13 +44,15 @@ func lookupEvents(topic string, fromStr string, toStr string) ([]sseserver.Event
 		return nil, nil
 	}
 
-	events := []sseserver.Event{}
+	var events []sseserver.Event
+
 	switch {
 	case to-from > 10:
 		// do not resync more than 10 events at a time
 		for i := from + 1; i <= from+10; i++ {
 			events = append(events, *newEvent(topic, strconv.Itoa(i)))
 		}
+
 		// send first 10 missing events
 		return events, nil
 	default:
@@ -71,7 +74,7 @@ func eventGenerator(stream sseserver.Stream) {
 	}
 }
 
-func Example_generic() {
+func main() {
 	stream := sseserver.NewGeneric(lookupEvents, "0", sseserver.DefaultConfig)
 	go eventGenerator(stream)
 
@@ -80,8 +83,8 @@ func Example_generic() {
 		if _, err = strconv.Atoi(r.Header.Get("Last-Event-ID")); err != nil {
 			fmt.Println(err)
 		}
-		err = stream.Subscribe(w, r.Header.Get("Last-Event-ID"))
-		if err != nil {
+
+		if err = stream.Subscribe(w, r.Header.Get("Last-Event-ID")); err != nil {
 			fmt.Println(err)
 		}
 	}

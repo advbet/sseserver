@@ -4,11 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"sync"
 	"time"
-
-	"github.com/sirupsen/logrus"
 )
 
 // cache is a custom cache implementation for events caching.
@@ -90,10 +89,7 @@ func (c *cache) add(topic, id string, event *Event) {
 	}
 
 	if _, ok := events[id]; ok {
-		logrus.WithFields(logrus.Fields{
-			"topic": topic,
-			"id":    id,
-		}).Warning("overwritten existing cache item")
+		slog.Warn("overwritten existing cache item", slog.String("topic", topic), slog.String("id", id))
 	}
 
 	events[id] = event
