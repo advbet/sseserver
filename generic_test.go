@@ -28,8 +28,8 @@ func TestGenericDisconnect(t *testing.T) {
 	defer stream.Stop()
 
 	w := httptest.NewRecorder()
-	err := stream.Subscribe(w, "first")
 
+	err := stream.Subscribe(w, "first")
 	if !errors.Is(err, resyncErr) {
 		t.Errorf("Expected error %v, got %v", resyncErr, err)
 	}
