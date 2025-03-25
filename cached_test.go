@@ -3,32 +3,31 @@ package sseserver
 import (
 	"bytes"
 	"errors"
-	"fmt"
+	"io"
+	"log/slog"
 	"net/http/httptest"
 	"strconv"
 	"testing"
 	"time"
-
-	gocache "github.com/patrickmn/go-cache"
 )
 
 var _ MultiStream = &CachedStream{}
 var _ Stream = &CachedStream{}
 
 var (
-	topic          = "benchmark_topic"
-	localCache     = newCache(time.Minute, time.Minute)
-	patrickmnCache = gocache.New(time.Minute, time.Minute)
+	topic      = "benchmark_topic"
+	localCache = newCache(time.Minute, time.Minute)
 )
 
 func init() {
+	slog.SetDefault(slog.New(slog.NewTextHandler(io.Discard, nil)))
+
 	for n := 0; n < 10000; n++ {
 		event := &Event{
 			ID: strconv.Itoa(n + 1),
 		}
 
 		localCache.add(topic, strconv.Itoa(n), event)
-		_ = patrickmnCache.Add(fmt.Sprintf("%s%d", topic, n), event, gocache.DefaultExpiration)
 	}
 }
 
@@ -40,32 +39,9 @@ func BenchmarkLocalCacheAdd(b *testing.B) {
 	}
 }
 
-func BenchmarkPatrickmnCacheAdd(b *testing.B) {
-	for n := 0; n < b.N; n++ {
-		_ = patrickmnCache.Add(fmt.Sprintf("%s%s", topic, strconv.Itoa(n-1)), &Event{
-			ID: strconv.Itoa(n),
-		}, gocache.DefaultExpiration)
-	}
-}
-
 func BenchmarkLocalCacheGet(b *testing.B) {
 	for n := 0; n < b.N; n++ {
 		events, _ := localCache.get(topic, "0", "5000", 5000, nil)
-		for range events {
-		}
-	}
-}
-
-func BenchmarkPatrickmnCacheGet(b *testing.B) {
-	for n := 0; n < b.N; n++ {
-		var events []*Event
-		for i := 0; i < 5000; i++ {
-			event, ok := patrickmnCache.Get(fmt.Sprintf("%s%d", topic, i))
-			if ok {
-				events = append(events, event.(*Event))
-			}
-		}
-
 		for range events {
 		}
 	}
