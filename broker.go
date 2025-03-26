@@ -43,7 +43,7 @@ func (b brokerChan) publish(topic string, event *Event, prePublish func(string))
 	}
 }
 
-// broadcast wil send given event to all active subsribers. Last event ID will
+// broadcast will send given event to all active subscribers. Last event ID will
 // only be updated if event ID field is not set to nil.
 func (b brokerChan) broadcast(event *Event) {
 	b <- command{
