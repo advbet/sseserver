@@ -5,11 +5,14 @@ import (
 	"testing"
 )
 
-// TestBorkerLastID checks if subscribing to broker correctly returns last
+// TestBrokerLastID checks if subscribing to broker correctly returns last
 // published event ID.
 func TestBrokerLastID(t *testing.T) {
+	t.Parallel()
+
 	broker := newBroker()
 	defer close(broker)
+
 	go broker.run(map[string]string{"": "123"})
 
 	// Before any publishing's last ID should be the same as given when
@@ -20,23 +23,28 @@ func TestBrokerLastID(t *testing.T) {
 	}
 
 	broker.publish("", &Event{ID: "1"}, nil)
+
 	lastID = broker.subscribe("", make(chan *Event))
 	if lastID != "1" {
 		t.Errorf("expected lastID to be '1', got '%s'", lastID)
 	}
 
 	broker.publish("", &Event{ID: "2"}, nil)
+
 	lastID = broker.subscribe("", make(chan *Event))
 	if lastID != "2" {
 		t.Errorf("expected lastID to be '2', got '%s'", lastID)
 	}
 }
 
-// TestBorkerLastIDTopics checks if using multiple topics does track event IDs
+// TestBrokerLastIDTopics checks if using multiple topics does track event IDs
 // independently.
 func TestBrokerLastIDTopics(t *testing.T) {
+	t.Parallel()
+
 	broker := newBroker()
 	defer close(broker)
+
 	go broker.run(map[string]string{
 		"topic1": "123",
 		"topic2": "456",
@@ -56,6 +64,7 @@ func TestBrokerLastIDTopics(t *testing.T) {
 
 	// Publish on topic1
 	broker.publish("topic1", &Event{ID: "1"}, nil)
+
 	lastID = broker.subscribe("topic1", make(chan *Event))
 	if lastID != "1" {
 		t.Errorf("expected lastID for topic1 to be '1', got '%s'", lastID)
@@ -68,6 +77,7 @@ func TestBrokerLastIDTopics(t *testing.T) {
 
 	// Publish on topic2
 	broker.publish("topic2", &Event{ID: "2"}, nil)
+
 	lastID = broker.subscribe("topic1", make(chan *Event))
 	if lastID != "1" {
 		t.Errorf("expected lastID for topic1 to be '1', got '%s'", lastID)
@@ -79,8 +89,10 @@ func TestBrokerLastIDTopics(t *testing.T) {
 	}
 }
 
-// TestBrokerStop cheks if closing broker closes all subscribers.
+// TestBrokerStop checks if closing broker closes all subscribers.
 func TestBrokerStop(t *testing.T) {
+	t.Parallel()
+
 	broker := newBroker()
 	go broker.run(nil)
 
@@ -96,11 +108,14 @@ func TestBrokerStop(t *testing.T) {
 	}
 }
 
-// TestBrokerPublish cheks if published event is broadcasted to all of the
+// TestBrokerPublish checks if published event is broadcasted to all of the
 // subscribers.
 func TestBrokerPublish(t *testing.T) {
+	t.Parallel()
+
 	broker := newBroker()
 	defer close(broker)
+
 	go broker.run(nil)
 
 	// attach three clients to the broker
@@ -122,24 +137,30 @@ func TestBrokerPublish(t *testing.T) {
 		e, ok := <-client
 		if !ok {
 			t.Errorf("client %d: channel unexpectedly closed", i)
+
 			continue
 		}
+
 		if e.ID != event.ID || e.Event != event.Event || e.Data != event.Data {
 			t.Errorf("client %d: expected event %+v, got %+v", i, event, e)
 		}
 	}
 }
 
-// TestBrokerPublishTopics cheks if published event is broadcasted to all of the
-// subscribers and broadcasts does not mix between topics.
+// TestBrokerPublishTopics checks if published event is broadcasted
+// to all the subscribers and broadcasts does not mix between topics.
 func TestBrokerPublishTopics(t *testing.T) {
+	t.Parallel()
+
 	broker := newBroker()
 	defer close(broker)
+
 	go broker.run(nil)
 
 	// attach three clients to the broker
 	clients1 := make([]chan *Event, 3)
 	clients2 := make([]chan *Event, 3)
+
 	for i := 0; i < 3; i++ {
 		clients1[i] = make(chan *Event, 10)
 		broker.subscribe("topic1", clients1[i])
@@ -160,8 +181,10 @@ func TestBrokerPublishTopics(t *testing.T) {
 		e, ok := <-client
 		if !ok {
 			t.Errorf("topic1 client %d: channel unexpectedly closed", i)
+
 			continue
 		}
+
 		if e.ID != event1.ID || e.Event != event1.Event || e.Data != event1.Data {
 			t.Errorf("topic1 client %d: expected event %+v, got %+v", i, event1, e)
 		}
@@ -171,19 +194,24 @@ func TestBrokerPublishTopics(t *testing.T) {
 		e, ok := <-client
 		if !ok {
 			t.Errorf("topic2 client %d: channel unexpectedly closed", i)
+
 			continue
 		}
+
 		if e.ID != event2.ID || e.Event != event2.Event || e.Data != event2.Data {
 			t.Errorf("topic2 client %d: expected event %+v, got %+v", i, event2, e)
 		}
 	}
 }
 
-// TestBrokerPublishFull cheks if subscribers with full channels are
+// TestBrokerPublishFull checks if subscribers with full channels are
 // does not block publishing and are automatically disconnected.
 func TestBrokerPublishFull(t *testing.T) {
+	t.Parallel()
+
 	broker := newBroker()
 	defer close(broker)
+
 	go broker.run(nil)
 
 	// Create new client with 3 events buffer size
@@ -203,6 +231,7 @@ func TestBrokerPublishFull(t *testing.T) {
 		if !ok {
 			t.Fatalf("client channel closed prematurely at iteration %d", i)
 		}
+
 		expectedID := strconv.Itoa(i)
 		if e.ID != expectedID {
 			t.Errorf("expected event ID %s, got %s", expectedID, e.ID)
@@ -220,8 +249,11 @@ func TestBrokerPublishFull(t *testing.T) {
 // TestBrokerUnsubscribe checks if unsubscribing from broker does not receive
 // further events and closes client channel.
 func TestBrokerUnsubscribe(t *testing.T) {
+	t.Parallel()
+
 	broker := newBroker()
 	defer close(broker)
+
 	go broker.run(nil)
 
 	client := make(chan *Event, 10)
@@ -243,13 +275,17 @@ func TestBrokerUnsubscribe(t *testing.T) {
 }
 
 func TestBrokerBroadcast(t *testing.T) {
+	t.Parallel()
+
 	broker := newBroker()
 	defer close(broker)
+
 	go broker.run(nil)
 
 	// attach three clients to the broker
 	clients1 := make([]chan *Event, 3)
 	clients2 := make([]chan *Event, 3)
+
 	for i := 0; i < 3; i++ {
 		clients1[i] = make(chan *Event, 10)
 		broker.subscribe("topic1", clients1[i])
@@ -267,8 +303,10 @@ func TestBrokerBroadcast(t *testing.T) {
 		e, ok := <-client
 		if !ok {
 			t.Errorf("topic1 client %d: channel unexpectedly closed", i)
+
 			continue
 		}
+
 		if e.ID != event.ID || e.Event != event.Event || e.Data != event.Data {
 			t.Errorf("topic1 client %d: expected event %+v, got %+v", i, event, e)
 		}
@@ -278,8 +316,10 @@ func TestBrokerBroadcast(t *testing.T) {
 		e, ok := <-client
 		if !ok {
 			t.Errorf("topic2 client %d: channel unexpectedly closed", i)
+
 			continue
 		}
+
 		if e.ID != event.ID || e.Event != event.Event || e.Data != event.Data {
 			t.Errorf("topic2 client %d: expected event %+v, got %+v", i, event, e)
 		}

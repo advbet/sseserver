@@ -11,8 +11,10 @@ import (
 	"time"
 )
 
-var _ MultiStream = &CachedStream{}
-var _ Stream = &CachedStream{}
+var (
+	_ MultiStream = &CachedStream{}
+	_ Stream      = &CachedStream{}
+)
 
 var (
 	topic      = "benchmark_topic"
@@ -42,12 +44,15 @@ func BenchmarkLocalCacheAdd(b *testing.B) {
 func BenchmarkLocalCacheGet(b *testing.B) {
 	for n := 0; n < b.N; n++ {
 		events, _ := localCache.get(topic, "0", "5000", 5000, nil)
+
 		for range events {
 		}
 	}
 }
 
 func assertReceivedEvents(t *testing.T, resp *httptest.ResponseRecorder, events ...Event) {
+	t.Helper()
+
 	var buf bytes.Buffer
 	for _, event := range events {
 		_ = write(&buf, &event)
@@ -59,6 +64,8 @@ func assertReceivedEvents(t *testing.T, resp *httptest.ResponseRecorder, events 
 }
 
 func TestCachedResync(t *testing.T) {
+	t.Parallel()
+
 	stream := NewCached("first", Config{
 		Reconnect:             0,
 		KeepAlive:             0,
@@ -71,6 +78,7 @@ func TestCachedResync(t *testing.T) {
 	// Publish two events
 	event1 := Event{ID: "16"}
 	stream.Publish(&event1)
+
 	event2 := Event{ID: "32"}
 	stream.Publish(&event2)
 
@@ -83,6 +91,8 @@ func TestCachedResync(t *testing.T) {
 }
 
 func TestCachedResyncWithBroadcast(t *testing.T) {
+	t.Parallel()
+
 	stream := NewCached("first", Config{
 		Reconnect:             0,
 		KeepAlive:             0,
@@ -109,6 +119,8 @@ func TestCachedResyncWithBroadcast(t *testing.T) {
 }
 
 func TestCachedError(t *testing.T) {
+	t.Parallel()
+
 	stream := NewCached("8", Config{
 		Reconnect:   0,
 		KeepAlive:   0,
@@ -126,6 +138,8 @@ func TestCachedError(t *testing.T) {
 }
 
 func TestCachedResyncTopics(t *testing.T) {
+	t.Parallel()
+
 	stream := NewCachedMultiStream(map[string]string{
 		"topic1": "first1",
 		"topic2": "first2",
@@ -140,6 +154,7 @@ func TestCachedResyncTopics(t *testing.T) {
 
 	// Generate two sub-streams of events
 	var events1, events2 []Event
+
 	for i := 0; i < 5; i++ {
 		event1 := Event{ID: strconv.Itoa(i * 10)}
 		events1 = append(events1, event1)
@@ -155,6 +170,7 @@ func TestCachedResyncTopics(t *testing.T) {
 		_ = stream.SubscribeTopic(w, "topic1", "first1")
 		assertReceivedEvents(t, w, events1...)
 	})
+
 	t.Run("with topic2", func(t *testing.T) {
 		w := httptest.NewRecorder()
 		_ = stream.SubscribeTopic(w, "topic2", "first2")

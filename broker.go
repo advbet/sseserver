@@ -43,7 +43,7 @@ func (b brokerChan) publish(topic string, event *Event, prePublish func(string))
 	}
 }
 
-// broadcast wil send given event to all active subsribers. Last event ID will
+// broadcast will send given event to all active subscribers. Last event ID will
 // only be updated if event ID field is not set to nil.
 func (b brokerChan) broadcast(event *Event) {
 	b <- command{
@@ -80,6 +80,7 @@ func (b brokerChan) unsubscribe(ch chan<- *Event) {
 // stream have this code running in a separate goroutine.
 func (b brokerChan) run(lastIDs map[string]string) {
 	sinks := make(map[chan<- *Event]string)
+
 	if lastIDs == nil {
 		lastIDs = make(map[string]string)
 	}
@@ -114,19 +115,23 @@ func (b brokerChan) run(lastIDs map[string]string) {
 				if cmd.event.ID != "" {
 					lastIDs[topic] = cmd.event.ID
 				}
+
 				emit(ch, cmd.event)
 			}
 		case publish:
 			if cmd.prePublish != nil {
 				cmd.prePublish(lastIDs[cmd.topic])
 			}
+
 			if cmd.event.ID != "" {
 				lastIDs[cmd.topic] = cmd.event.ID
 			}
+
 			for ch, topic := range sinks {
 				if topic != cmd.topic {
 					continue
 				}
+
 				emit(ch, cmd.event)
 			}
 		}

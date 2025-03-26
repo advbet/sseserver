@@ -26,6 +26,8 @@ func recordResponse(t *testing.T, source <-chan *Event, c *Config, stop <-chan s
 }
 
 func TestRespondWithoutFlusher(t *testing.T) {
+	t.Parallel()
+
 	var w writerNotFlusher
 
 	defer func() {
@@ -38,6 +40,8 @@ func TestRespondWithoutFlusher(t *testing.T) {
 }
 
 func TestRespondReconnect(t *testing.T) {
+	t.Parallel()
+
 	source := make(chan *Event)
 	// Make sure request ends because source is drained
 	close(source)
@@ -60,8 +64,10 @@ func TestRespondReconnect(t *testing.T) {
 }
 
 func TestRespondContentType(t *testing.T) {
+	t.Parallel()
+
 	source := make(chan *Event)
-	// Make sure request ends because source is drained
+	// Make sure request ends because source is drained.
 	close(source)
 
 	w := recordResponse(t, source, &Config{}, nil)
@@ -73,8 +79,10 @@ func TestRespondContentType(t *testing.T) {
 }
 
 func TestRespondTimeout(t *testing.T) {
+	t.Parallel()
+
 	source := make(chan *Event)
-	// Close source after 1 second if timeout does not work
+	// Close source after 1 second if timeout does not work.
 	time.AfterFunc(1*time.Second, func() { close(source) })
 
 	start := time.Now()
@@ -90,6 +98,8 @@ func TestRespondTimeout(t *testing.T) {
 }
 
 func TestRespondKeepAlive(t *testing.T) {
+	t.Parallel()
+
 	source := make(chan *Event)
 	// Close source after 50 milliseconds
 	time.AfterFunc(50*time.Millisecond, func() { close(source) })
@@ -103,6 +113,8 @@ func TestRespondKeepAlive(t *testing.T) {
 }
 
 func TestRespondStop(t *testing.T) {
+	t.Parallel()
+
 	source := make(chan *Event)
 	// Close source after 1 second if close does not work
 	time.AfterFunc(1*time.Second, func() { close(source) })
@@ -121,6 +133,8 @@ func TestRespondStop(t *testing.T) {
 }
 
 func TestRespondWrite(t *testing.T) {
+	t.Parallel()
+
 	source := make(chan *Event, 1)
 	expected := []byte("id: 42\nevent: single\ndata: \"body\"\n\n")
 
@@ -145,6 +159,8 @@ type customResponseRecorder struct {
 func (rw *customResponseRecorder) CloseNotify() <-chan bool { return rw.closeChan }
 
 func TestRespondCloseNotify(t *testing.T) {
+	t.Parallel()
+
 	source := make(chan *Event)
 	// Close source after 1 second if client close does not work
 	time.AfterFunc(1*time.Second, func() { close(source) })
@@ -163,13 +179,16 @@ func TestRespondCloseNotify(t *testing.T) {
 }
 
 func TestApplyFilter(t *testing.T) {
+	t.Parallel()
+
 	evenFilterGen := func() FilterFn {
 		var n int
 		return func(e *Event) *Event {
-			n += 1
+			n++
 			if n%2 == 1 {
 				return e
 			}
+
 			return nil
 		}
 	}
@@ -205,7 +224,9 @@ func TestApplyFilter(t *testing.T) {
 			for _, e := range test.input {
 				in <- e
 			}
+
 			close(in)
+
 			output := make([]*Event, 0)
 			for e := range applyChanFilter(in, test.filter) {
 				output = append(output, e)
