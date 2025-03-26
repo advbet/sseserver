@@ -22,8 +22,7 @@ type LastOnlyStream struct {
 var errFiltersNotSupported = errors.New("filters are not supported")
 
 // NewLastOnly creates a new sse stream that resends only last seen event to all
-// newly connected clients. If client alredy have seen the lates event is is not
-// repeated.
+// newly connected clients. If client already have seen the latest event is not repeated.
 //
 // Event filtering is not supported.
 func NewLastOnly(cfg Config) *LastOnlyStream {
@@ -33,7 +32,9 @@ func NewLastOnly(cfg Config) *LastOnlyStream {
 		responseStop: make(chan struct{}),
 		last:         make(map[string]map[string]*Event),
 	}
+
 	s.wg.Add(1)
+
 	go func() {
 		defer s.wg.Done()
 		s.broker.run(nil)
@@ -50,9 +51,11 @@ func (s *LastOnlyStream) PublishTopic(topic string, event *Event) {
 	s.broker.publish(topic, event, func(lastID string) {
 		s.Lock()
 		defer s.Unlock()
+
 		if _, ok := s.last[topic]; !ok {
 			s.last[topic] = make(map[string]*Event)
 		}
+
 		s.last[topic][event.Event] = event
 		s.lastEventID = event.ID
 	})
@@ -91,12 +94,15 @@ func (s *LastOnlyStream) SubscribeTopicFiltered(w http.ResponseWriter, topic str
 	s.RLock()
 	last := s.last[topic]
 	events := make([]Event, 0)
+
 	if len(last) > 0 && (lastEventID != s.lastEventID || lastEventID == "") {
 		s := make([]string, 0)
 		for key := range last {
 			s = append(s, key)
 		}
+
 		sort.Strings(s)
+
 		for _, k := range s {
 			events = append(events, *last[k])
 		}

@@ -7,10 +7,14 @@ import (
 	"time"
 )
 
-var _ Stream = &LastOnlyStream{}
-var _ MultiStream = &LastOnlyStream{}
+var (
+	_ Stream      = &LastOnlyStream{}
+	_ MultiStream = &LastOnlyStream{}
+)
 
 func TestLastOnlyResync(t *testing.T) {
+	t.Parallel()
+
 	stream := NewLastOnly(Config{
 		Reconnect:   0,
 		KeepAlive:   0,
@@ -49,6 +53,8 @@ func TestLastOnlyResync(t *testing.T) {
 }
 
 func TestLastOnlyTopics(t *testing.T) {
+	t.Parallel()
+
 	stream := NewLastOnly(Config{
 		Reconnect:   0,
 		KeepAlive:   0,
@@ -77,6 +83,8 @@ func TestLastOnlyTopics(t *testing.T) {
 }
 
 func TestLastPerTopic(t *testing.T) {
+	t.Parallel()
+
 	stream := NewLastOnly(Config{
 		Reconnect:   0,
 		KeepAlive:   0,
@@ -108,6 +116,8 @@ func TestLastPerTopic(t *testing.T) {
 }
 
 func TestFilterSupport(t *testing.T) {
+	t.Parallel()
+
 	stream := NewLastOnly(Config{
 		Reconnect:   0,
 		KeepAlive:   0,

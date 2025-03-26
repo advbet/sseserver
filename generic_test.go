@@ -7,8 +7,10 @@ import (
 	"time"
 )
 
-var _ Stream = &GenericStream{}
-var _ MultiStream = &GenericStream{}
+var (
+	_ Stream      = &GenericStream{}
+	_ MultiStream = &GenericStream{}
+)
 
 func resyncGenerator(events []Event, err error) ResyncFn {
 	return func(topic string, fromID, toID string) ([]Event, error) {
@@ -17,6 +19,8 @@ func resyncGenerator(events []Event, err error) ResyncFn {
 }
 
 func TestGenericDisconnect(t *testing.T) {
+	t.Parallel()
+
 	resyncErr := errors.New("error")
 	stream := NewGeneric(resyncGenerator(nil, resyncErr), "first", Config{
 		Reconnect:             0,
@@ -36,6 +40,8 @@ func TestGenericDisconnect(t *testing.T) {
 }
 
 func TestGenericResyncThreshold(t *testing.T) {
+	t.Parallel()
+
 	expected := []Event{{ID: "1"}, {ID: "2"}}
 	stream := NewGeneric(resyncGenerator(expected, nil), "first", Config{
 		Reconnect:             0,
@@ -52,6 +58,8 @@ func TestGenericResyncThreshold(t *testing.T) {
 }
 
 func TestGenericResyncBeforeDisconnect(t *testing.T) {
+	t.Parallel()
+
 	expected := []Event{{ID: "1"}, {ID: "2"}}
 	var synced bool
 	errSynced := errors.New("synced")
@@ -88,6 +96,8 @@ func TestGenericResyncBeforeDisconnect(t *testing.T) {
 }
 
 func TestGenericInitialLastEventID(t *testing.T) {
+	t.Parallel()
+
 	initialID := "15"
 	var actualID string
 	resync := func(topic string, fromID, toID string) ([]Event, error) {
@@ -112,6 +122,8 @@ func TestGenericInitialLastEventID(t *testing.T) {
 }
 
 func TestGenericResyncTopic(t *testing.T) {
+	t.Parallel()
+
 	const topic = "some-topic"
 	var receivedTopic string
 	resync := func(topic string, fromID, toID string) ([]Event, error) {
@@ -136,6 +148,8 @@ func TestGenericResyncTopic(t *testing.T) {
 }
 
 func TestPrependStream(t *testing.T) {
+	t.Parallel()
+
 	events := []Event{
 		{ID: "1"},
 		{ID: "2"},
@@ -175,6 +189,8 @@ func TestPrependStream(t *testing.T) {
 // TestPrependStreamStatic checks if prependStream works correctly if nil is
 // passed instead of source stream
 func TestPrependStreamStatic(t *testing.T) {
+	t.Parallel()
+
 	events := []Event{
 		{ID: "1"},
 		{ID: "2"},

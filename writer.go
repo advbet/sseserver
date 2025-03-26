@@ -62,9 +62,10 @@ var DefaultConfig = Config{
 var errFlusherIface = errors.New("http.ResponseWriter does not implement http.Flusher interface")
 
 // drain reads and discards all data from source channel in a separate go
-// routine
+// routine.
 func drain(source <-chan *Event) {
 	go func() {
+		//nolint:revive
 		for range source {
 		}
 	}()
@@ -116,6 +117,7 @@ func Respond(w http.ResponseWriter, source <-chan *Event, cfg *Config, stop <-ch
 	}
 
 	var keepaliveChan <-chan time.Time
+
 	if cfg.KeepAlive > 0 {
 		ticker := time.NewTicker(cfg.KeepAlive)
 		defer ticker.Stop()
@@ -131,6 +133,7 @@ func Respond(w http.ResponseWriter, source <-chan *Event, cfg *Config, stop <-ch
 		if _, err := fmt.Fprintf(w, "retry: %d\n\n", cfg.Reconnect/time.Millisecond); err != nil {
 			return err
 		}
+
 		flusher.Flush()
 	}
 
@@ -150,18 +153,22 @@ loop:
 			if _, err := io.WriteString(w, ":keep-alive\n\n"); err != nil {
 				return err
 			}
+
 			flusher.Flush()
 		case event, ok := <-source:
 			if !ok {
 				// Source is drained
 				break loop
 			}
+
 			if err := write(w, event); err != nil {
 				return err
 			}
+
 			flusher.Flush()
 		}
 	}
+
 	return nil
 }
 
@@ -171,6 +178,7 @@ func write(w io.Writer, e *Event) error {
 	if e == nil {
 		return nil
 	}
+
 	if e.ID != "" {
 		if _, err := fmt.Fprintf(w, "id: %s\n", e.ID); err != nil {
 			return err
@@ -221,6 +229,7 @@ func applyChanFilter(input <-chan *Event, f FilterFn) <-chan *Event {
 	output := make(chan *Event)
 	go func() {
 		defer close(output)
+
 		for e := range input {
 			event := f(e)
 			if event != nil {
@@ -228,11 +237,14 @@ func applyChanFilter(input <-chan *Event, f FilterFn) <-chan *Event {
 			}
 		}
 	}()
+
 	return output
 }
 
 func applySliceFilter(events []Event, f FilterFn) []Event {
 	result := make([]Event, 0)
+
+	//nolint:gosec
 	for _, event := range events {
 		if e := f(&event); e != nil {
 			result = append(result, *e)

@@ -35,11 +35,14 @@ func NewGenericMultiStream(resync ResyncFn, lastIDs map[string]string, cfg Confi
 		cfg:          cfg,
 		responseStop: make(chan struct{}),
 	}
+
 	s.wg.Add(1)
+
 	go func() {
 		defer s.wg.Done()
 		s.broker.run(lastIDs)
 	}()
+
 	return s
 }
 
@@ -82,19 +85,24 @@ func (s *GenericStream) SubscribeTopicFiltered(w http.ResponseWriter, topic stri
 			if len(events) > 0 {
 				return Respond(w, prependStream(events, nil), &s.cfg, s.responseStop)
 			}
+
 			return err
 		}
+
 		if len(list) == 0 {
 			return Respond(w, prependStream(events, applyChanFilter(source, f)), &s.cfg, s.responseStop)
 		}
+
 		switch f {
 		case nil:
 			events = append(events, list...)
 		default:
 			events = append(events, applySliceFilter(list, f)...)
 		}
+
 		lastEventID = list[len(list)-1].ID
 	}
+
 	return Respond(w, prependStream(events, nil), &s.cfg, s.responseStop)
 }
 
@@ -107,7 +115,7 @@ func (s *GenericStream) Stop() {
 	s.wg.Wait()
 }
 
-// prependStream takes slice and channel of events and and produces new channel
+// prependStream takes slice and channel of events and produces new channel
 // that will contain all events in the slice followed by the events in source
 // channel. If source channel is nil it will be ignored an only events in the
 // slice will be used.
@@ -119,15 +127,18 @@ func prependStream(events []Event, source <-chan *Event) <-chan *Event {
 		for i := range events {
 			sink <- &events[i]
 		}
+
 		// Exit if source stream is missing, this allows to reuse this
 		// function for generating stream from slice only
 		if source == nil {
 			return
 		}
+
 		// Restream source channel
 		for event := range source {
 			sink <- event
 		}
 	}()
+
 	return sink
 }

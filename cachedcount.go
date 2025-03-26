@@ -45,7 +45,9 @@ func NewCachedCountMultiStream(lastIDs map[string]string, cfg Config, size int) 
 		ctr:          0,
 		events:       make(map[string]*Event),
 	}
+
 	s.wg.Add(1)
+
 	go func() {
 		defer s.wg.Done()
 		s.broker.run(lastIDs)
@@ -63,7 +65,9 @@ func (s *CachedCountStream) PublishTopic(topic string, event *Event) {
 		s.mu.Lock()
 		s.ctr = (s.ctr + 1) % s.maxKeysCount
 		delete(s.events, s.lastKeys[s.ctr])
+
 		key := topicIDKey(topic, lastID)
+
 		s.events[key] = event
 		s.lastKeys[s.ctr] = key
 		s.mu.Unlock()
@@ -100,21 +104,25 @@ func (s *CachedCountStream) SubscribeTopicFiltered(w http.ResponseWriter, topic 
 	}
 
 	var events []Event
+
 	s.mu.RLock()
 	for {
 		event, ok := s.events[topicIDKey(topic, lastClientID)]
 		if !ok {
 			s.mu.RUnlock()
+
 			return ErrCacheMiss
 		}
 
 		events = append(events, *event)
 		lastClientID = event.ID
+
 		if lastServerID == lastClientID {
 			break
 		}
 	}
 	s.mu.RUnlock()
+
 	return Respond(w, applyChanFilter(prependStream(events, source), f), &s.cfg, s.responseStop)
 }
 
