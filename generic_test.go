@@ -8,8 +8,8 @@ import (
 )
 
 var (
-	_ Stream      = &GenericStream{}
-	_ MultiStream = &GenericStream{}
+	_ StreamWithContext      = &GenericStream{}
+	_ MultiStreamWithContext = &GenericStream{}
 )
 
 func resyncGenerator(events []Event, err error) ResyncFn {
@@ -32,8 +32,9 @@ func TestGenericDisconnect(t *testing.T) {
 	defer stream.Stop()
 
 	w := httptest.NewRecorder()
+	r := httptest.NewRequestWithContext(t.Context(), "GET", "/", nil)
 
-	err := stream.Subscribe(w, "first")
+	err := stream.Subscribe(w, r, "first")
 	if !errors.Is(err, resyncErr) {
 		t.Errorf("Expected error %v, got %v", resyncErr, err)
 	}
@@ -53,7 +54,8 @@ func TestGenericResyncThreshold(t *testing.T) {
 	defer stream.Stop()
 
 	w := httptest.NewRecorder()
-	_ = stream.Subscribe(w, "")
+	r := httptest.NewRequestWithContext(t.Context(), "GET", "/", nil)
+	_ = stream.Subscribe(w, r, "")
 	assertReceivedEvents(t, w, expected...)
 }
 
@@ -81,7 +83,8 @@ func TestGenericResyncBeforeDisconnect(t *testing.T) {
 
 	// Get resynced events
 	w1 := httptest.NewRecorder()
-	err1 := stream.Subscribe(w1, "")
+	r1 := httptest.NewRequestWithContext(t.Context(), "GET", "/", nil)
+	err1 := stream.Subscribe(w1, r1, "")
 	if err1 != nil {
 		t.Errorf("Expected nil error, got %v", err1)
 	}
@@ -89,7 +92,8 @@ func TestGenericResyncBeforeDisconnect(t *testing.T) {
 
 	// Client reconnects after resync
 	w2 := httptest.NewRecorder()
-	err2 := stream.Subscribe(w2, "2")
+	r2 := httptest.NewRequestWithContext(t.Context(), "GET", "/", nil)
+	err2 := stream.Subscribe(w2, r2, "2")
 	if !errors.Is(err2, errSynced) {
 		t.Errorf("Expected error %v, got %v", errSynced, err2)
 	}
@@ -114,7 +118,8 @@ func TestGenericInitialLastEventID(t *testing.T) {
 	defer stream.Stop()
 
 	w := httptest.NewRecorder()
-	_ = stream.Subscribe(w, "")
+	r := httptest.NewRequestWithContext(t.Context(), "GET", "/", nil)
+	_ = stream.Subscribe(w, r, "")
 	assertReceivedEvents(t, w)
 	if actualID != initialID {
 		t.Errorf("Expected ID %s, got %s", initialID, actualID)
@@ -140,7 +145,8 @@ func TestGenericResyncTopic(t *testing.T) {
 	defer stream.Stop()
 
 	w := httptest.NewRecorder()
-	_ = stream.SubscribeTopic(w, topic, "0")
+	r := httptest.NewRequestWithContext(t.Context(), "GET", "/", nil)
+	_ = stream.SubscribeTopic(w, r, topic, "0")
 	assertReceivedEvents(t, w)
 	if receivedTopic != topic {
 		t.Errorf("resync function received wrong topic: expected %s, got %s", topic, receivedTopic)

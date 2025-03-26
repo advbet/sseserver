@@ -1,6 +1,7 @@
 package sseserver
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -172,6 +173,110 @@ loop:
 	return nil
 }
 
+// RespondWithContext reads Events from a channel and writes SSE HTTP response,
+// with context awareness for proper connection handling. This allows for graceful
+// termination when the client disconnects or the request is canceled.
+//
+// Ctx is used to detect when the client disconnects or the request is canceled.
+// W is the response writer for the SSE stream.
+// Source provides the events to be sent to the client.
+// Cfg is SSE stream configuration, if nil is passed configuration from
+// DefaultConfiguration global will be used.
+// Stop is an optional channel for stopping SSE stream, if this channel is
+// closed SSE stream will stop and http connection closed.
+//
+// This function returns nil if end of stream is reached, stream lifetime
+// expired, client closes the connection or request to stop is received on the
+// stop channel. Otherwise, it returns an error.
+func RespondWithContext(ctx context.Context, w http.ResponseWriter, source <-chan *Event, cfg *Config, stop <-chan struct{}) error {
+	// Create a merged cancellation context that incorporates the stop channel
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel() // Ensure resources are cleaned up
+
+	// Handle the stop channel by canceling context
+	if stop != nil {
+		go func() {
+			select {
+			case <-stop:
+				cancel()
+			case <-ctx.Done():
+				// Context already done, nothing to do
+			}
+		}()
+	}
+
+	// Draining the source stream can help protect against resource leaks if
+	// too small source chan buffer size was used and producer is stuck on
+	// trying to send more data. It has a downside that source channel will
+	// become useless after call to Stream.
+	defer drain(source)
+
+	if cfg == nil {
+		cfg = &DefaultConfig
+	}
+
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		panic(errFlusherIface)
+	}
+
+	var timeoutChan <-chan time.Time
+	if cfg.Lifetime > 0 {
+		timeoutChan = time.After(cfg.Lifetime)
+	}
+
+	var keepaliveChan <-chan time.Time
+	if cfg.KeepAlive > 0 {
+		ticker := time.NewTicker(cfg.KeepAlive)
+		defer ticker.Stop()
+		keepaliveChan = ticker.C
+	}
+
+	w.Header().Set("Content-Type", "text/event-stream; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-cache")
+	// Instruct nginx to disable buffering
+	w.Header().Set("X-Accel-Buffering", "no")
+
+	if cfg.Reconnect != 0 {
+		if _, err := fmt.Fprintf(w, "retry: %d\n\n", cfg.Reconnect/time.Millisecond); err != nil {
+			return err
+		}
+
+		flusher.Flush()
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			// Client disconnected or context cancelled
+			return nil
+
+		case <-timeoutChan:
+			// Stream lifetime expired
+			return nil
+
+		case <-keepaliveChan:
+			if _, err := io.WriteString(w, ":keep-alive\n\n"); err != nil {
+				return fmt.Errorf("failed to write keepalive: %w", err)
+			}
+
+			flusher.Flush()
+
+		case event, ok := <-source:
+			if !ok {
+				// Source channel closed, end stream normally
+				return nil
+			}
+
+			if err := write(w, event); err != nil {
+				return fmt.Errorf("failed to write event: %w", err)
+			}
+
+			flusher.Flush()
+		}
+	}
+}
+
 // Write dumps single event in SSE wire format to a http.ResponseWriter.
 // Flushing should be performed by the caller.
 func write(w io.Writer, e *Event) error {
@@ -244,7 +349,6 @@ func applyChanFilter(input <-chan *Event, f FilterFn) <-chan *Event {
 func applySliceFilter(events []Event, f FilterFn) []Event {
 	result := make([]Event, 0)
 
-	//nolint:gosec
 	for _, event := range events {
 		if e := f(&event); e != nil {
 			result = append(result, *e)
