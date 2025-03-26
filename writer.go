@@ -217,7 +217,7 @@ func RespondWithContext(ctx context.Context, w http.ResponseWriter, source <-cha
 
 	flusher, ok := w.(http.Flusher)
 	if !ok {
-		panic(errFlusherIface)
+		return fmt.Errorf("http.ResponseWriter does not implement http.Flusher interface: %w", errFlusherIface)
 	}
 
 	var timeoutChan <-chan time.Time
