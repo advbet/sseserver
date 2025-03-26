@@ -220,8 +220,6 @@ func TestApplyFilter(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.msg, func(t *testing.T) {
-			t.Parallel()
-
 			in := make(chan *Event, len(test.input))
 			for _, e := range test.input {
 				in <- e
