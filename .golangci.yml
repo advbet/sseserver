@@ -57,12 +57,6 @@ linters:
         # G104: Audit errors not checked.
         # This already checked by errcheck.
         - G104
-    errcheck:
-      exclude-functions:
-        - github.com/coreos/go-systemd/v22/daemon.SdNotify
-        - (*github.com/ory/dockertest/v3.Pool).Purge
-        - (*github.com/ory/dockertest/v3.Resource).Expire
-        - (net/http.ResponseWriter).Write
     # by default all testifylint rules are disabled
     testifylint:
       enable-all: true
