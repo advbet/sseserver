@@ -5,6 +5,8 @@ import (
 	"sync"
 )
 
+// CachedCountStream caches SSE events up to a limit.
+// Returns ErrCacheMiss if a requested event is not found.
 type CachedCountStream struct {
 	broker       brokerChan
 	cfg          Config

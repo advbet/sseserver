@@ -7,6 +7,7 @@ import (
 	"sync"
 )
 
+// LastOnlyStream sends only the last SSE event per topic to new clients.
 type LastOnlyStream struct {
 	broker       brokerChan
 	cfg          Config
@@ -52,6 +53,7 @@ func (s *LastOnlyStream) Publish(event *Event) {
 // PublishTopic sends an event to the specified topic.
 // The event is cached to support client resynchronization.
 func (s *LastOnlyStream) PublishTopic(topic string, event *Event) {
+	//nolint:revive
 	s.broker.publish(topic, event, func(lastID string) {
 		s.Lock()
 		defer s.Unlock()
