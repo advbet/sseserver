@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/advbet/sseserver"
+	"github.com/advbet/sseserver/v2"
 )
 
 func eventSource(stream sseserver.Stream) {
