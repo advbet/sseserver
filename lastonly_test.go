@@ -8,8 +8,8 @@ import (
 )
 
 var (
-	_ Stream      = &LastOnlyStream{}
-	_ MultiStream = &LastOnlyStream{}
+	_ StreamWithContext      = &LastOnlyStream{}
+	_ MultiStreamWithContext = &LastOnlyStream{}
 )
 
 func TestLastOnlyResync(t *testing.T) {
@@ -31,21 +31,24 @@ func TestLastOnlyResync(t *testing.T) {
 
 	t.Run("no id", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		_ = stream.Subscribe(w, "")
+		r := httptest.NewRequestWithContext(t.Context(), "GET", "/", nil)
+		_ = stream.Subscribe(w, r, "")
 		// client should receive only last event
 		assertReceivedEvents(t, w, event2)
 	})
 
 	t.Run("id old", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		_ = stream.Subscribe(w, "16")
+		r := httptest.NewRequestWithContext(t.Context(), "GET", "/", nil)
+		_ = stream.Subscribe(w, r, "16")
 		// client should receive only last event
 		assertReceivedEvents(t, w, event2)
 	})
 
 	t.Run("id up to date", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		_ = stream.Subscribe(w, "32")
+		r := httptest.NewRequestWithContext(t.Context(), "GET", "/", nil)
+		_ = stream.Subscribe(w, r, "32")
 		// connect with up to date last event ID,
 		// should not generate duplicate events.
 		assertReceivedEvents(t, w)
@@ -71,13 +74,15 @@ func TestLastOnlyTopics(t *testing.T) {
 
 	t.Run("with topic1", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		_ = stream.SubscribeTopic(w, "topic1", "")
+		r := httptest.NewRequestWithContext(t.Context(), "GET", "/", nil)
+		_ = stream.SubscribeTopic(w, r, "topic1", "")
 		assertReceivedEvents(t, w, event1)
 	})
 
 	t.Run("with topic2", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		_ = stream.SubscribeTopic(w, "topic2", "")
+		r := httptest.NewRequestWithContext(t.Context(), "GET", "/", nil)
+		_ = stream.SubscribeTopic(w, r, "topic2", "")
 		assertReceivedEvents(t, w, event2)
 	})
 }
@@ -104,13 +109,15 @@ func TestLastPerTopic(t *testing.T) {
 
 	t.Run("receive ids 1 and 3", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		_ = stream.SubscribeTopic(w, "topic1", "")
+		r := httptest.NewRequestWithContext(t.Context(), "GET", "/", nil)
+		_ = stream.SubscribeTopic(w, r, "topic1", "")
 		assertReceivedEvents(t, w, event1, event2v2)
 	})
 
 	t.Run("receive none", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		_ = stream.SubscribeTopic(w, "topic1", "3")
+		r := httptest.NewRequestWithContext(t.Context(), "GET", "/", nil)
+		_ = stream.SubscribeTopic(w, r, "topic1", "3")
 		assertReceivedEvents(t, w)
 	})
 }
@@ -129,7 +136,8 @@ func TestFilterSupport(t *testing.T) {
 	f := FilterFn(func(e *Event) *Event { return nil })
 	t.Run("with filter should error", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		err := stream.SubscribeTopicFiltered(w, "topic1", "", f)
+		r := httptest.NewRequestWithContext(t.Context(), "GET", "/", nil)
+		err := stream.SubscribeTopicFiltered(w, r, "topic1", "", f)
 		if !errors.Is(err, errFiltersNotSupported) {
 			t.Errorf("Expected error %v, got %v", errFiltersNotSupported, err)
 		}
@@ -137,7 +145,8 @@ func TestFilterSupport(t *testing.T) {
 
 	t.Run("without filter should not error", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		err := stream.SubscribeTopicFiltered(w, "topic1", "", nil)
+		r := httptest.NewRequestWithContext(t.Context(), "GET", "/", nil)
+		err := stream.SubscribeTopicFiltered(w, r, "topic1", "", nil)
 		if err != nil {
 			t.Errorf("Expected nil error, got %v", err)
 		}

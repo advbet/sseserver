@@ -46,6 +46,46 @@ type Stream interface {
 	SubscribeFiltered(w http.ResponseWriter, lastEventID string, f FilterFn) error
 }
 
+type StreamWithContext interface {
+	// Publish broadcast given event to all currently connected clients
+	// (subscribers) on a default topic.
+	//
+	// Publish on a stopped stream will cause panic.
+	Publish(event *Event)
+
+	// DropSubscribers removes all currently active stream subscribers and
+	// close all active HTTP responses. After call to this method all new
+	// subscribers would be closed immediately. Calling DropSubscribers more
+	// than one time would panic.
+	//
+	// This function is useful in implementing graceful application
+	// shutdown, this method should be called only when web server are not
+	// accepting any new connections and all that is left is terminating
+	// already connected ones.
+	DropSubscribers()
+
+	// Stop closes event stream. It will disconnect all connected
+	// subscribers and deallocate all resources used for the stream. After
+	// stream is stopped it can not started again and should not be used
+	// anymore.
+	//
+	// Calls to Publish or Subscribe after stream was stopped will cause
+	// panic.
+	Stop()
+
+	// Subscribe handles HTTP request to receive SSE stream for a default
+	// topic. Caller is responsible for extracting Last event ID value from
+	// the request.
+	//
+	// Subscribe on a stopped stream will cause panic.
+	Subscribe(w http.ResponseWriter, r *http.Request, lastEventID string) error
+
+	// SubscribeFiltered is similar to Subscribe but each event before being
+	// sent to client will be passed to given filtering function. Events
+	// returned by the filtering function will be used instead.
+	SubscribeFiltered(w http.ResponseWriter, r *http.Request, lastEventID string, f FilterFn) error
+}
+
 // MultiStream is an abstraction of multiple SSE streams. Single instance of
 // object could be used to transmit multiple independent SSE stream. Each stream
 // is identified by a unique topic name. Application can broadcast events using
@@ -82,17 +122,61 @@ type MultiStream interface {
 	// panic.
 	Stop()
 
-	// Subscribe handles HTTP request to receive SSE stream for a given
+	// SubscribeTopic handles HTTP request to receive SSE stream for a given
 	// topic. Caller is responsible for extracting Last event ID value from
 	// the request.
 	//
 	// Subscribe on a stopped stream will cause panic.
 	SubscribeTopic(w http.ResponseWriter, topic string, lastEventID string) error
 
-	// SubscribeFiltered is similar to Subscribe but each event before being
+	// SubscribeTopicFiltered is similar to Subscribe but each event before being
 	// sent to client will be passed to given filtering function. Events
 	// returned by the filtering function will be used instead.
 	SubscribeTopicFiltered(w http.ResponseWriter, topic string, lastEventID string, f FilterFn) error
+}
+
+type MultiStreamWithContext interface {
+	// PublishTopic broadcast given event to all currently connected clients
+	// (subscribers) on a given topic.
+	//
+	// Publish on a stopped stream will cause panic.
+	PublishTopic(topic string, event *Event)
+
+	// PublishBroadcast emits given event to all connected subscribers (for
+	// all topics).
+	PublishBroadcast(event *Event)
+
+	// DropSubscribers removes all currently active stream subscribers and
+	// close all active HTTP responses. After call to this method all new
+	// subscribers would be closed immediately. Calling DropSubscribers more
+	// than one time would panic.
+	//
+	// This function is useful in implementing graceful application
+	// shutdown, this method should be called only when web server are not
+	// accepting any new connections and all that is left is terminating
+	// already connected ones.
+	DropSubscribers()
+
+	// Stop closes event stream. It will disconnect all connected
+	// subscribers and deallocate all resources used for the stream. After
+	// stream is stopped it can not started again and should not be used
+	// anymore.
+	//
+	// Calls to Publish or Subscribe after stream was stopped will cause
+	// panic.
+	Stop()
+
+	// SubscribeTopic handles HTTP request to receive SSE stream for a given
+	// topic. Caller is responsible for extracting Last event ID value from
+	// the request.
+	//
+	// Subscribe on a stopped stream will cause panic.
+	SubscribeTopic(w http.ResponseWriter, r *http.Request, topic string, lastEventID string) error
+
+	// SubscribeTopicFiltered is similar to Subscribe but each event before being
+	// sent to client will be passed to given filtering function. Events
+	// returned by the filtering function will be used instead.
+	SubscribeTopicFiltered(w http.ResponseWriter, r *http.Request, topic string, lastEventID string, f FilterFn) error
 }
 
 // ResyncFn is a definition of function used to lookup events missed by
