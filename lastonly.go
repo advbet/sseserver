@@ -81,16 +81,16 @@ func (s *LastOnlyStream) PublishBroadcast(event *Event) {
 // differs from the server's last event ID, it attempts to resynchronize
 // missing events from the cache.
 // Returns ErrCacheMiss if resynchronization is needed but events are not found in cache.
-func (s *LastOnlyStream) Subscribe(w http.ResponseWriter, lastEventID string) error {
-	return s.SubscribeTopicFiltered(w, "", lastEventID, nil)
+func (s *LastOnlyStream) Subscribe(w http.ResponseWriter, r *http.Request, lastEventID string) error {
+	return s.SubscribeTopicFiltered(w, r, "", lastEventID, nil)
 }
 
 // SubscribeFiltered adds a subscriber to the default topic ("") with event filtering
 // and starts sending events to the provided response writer. The filter function
 // can be used to modify or exclude events before sending them to the client.
 // Returns ErrCacheMiss if resynchronization is needed but events are not found in cache.
-func (s *LastOnlyStream) SubscribeFiltered(w http.ResponseWriter, lastEventID string, f FilterFn) error {
-	return s.SubscribeTopicFiltered(w, "", lastEventID, f)
+func (s *LastOnlyStream) SubscribeFiltered(w http.ResponseWriter, r *http.Request, lastEventID string, f FilterFn) error {
+	return s.SubscribeTopicFiltered(w, r, "", lastEventID, f)
 }
 
 // SubscribeTopic adds a subscriber to the specified topic and starts sending
@@ -98,8 +98,8 @@ func (s *LastOnlyStream) SubscribeFiltered(w http.ResponseWriter, lastEventID st
 // differs from the server's last event ID, it attempts to resynchronize
 // missing events from the cache.
 // Returns ErrCacheMiss if resynchronization is needed but events are not found in cache.
-func (s *LastOnlyStream) SubscribeTopic(w http.ResponseWriter, topic string, lastEventID string) error {
-	return s.SubscribeTopicFiltered(w, topic, lastEventID, nil)
+func (s *LastOnlyStream) SubscribeTopic(w http.ResponseWriter, r *http.Request, topic string, lastEventID string) error {
+	return s.SubscribeTopicFiltered(w, r, topic, lastEventID, nil)
 }
 
 // SubscribeTopicFiltered adds a subscriber to the specified topic with event filtering
@@ -107,7 +107,7 @@ func (s *LastOnlyStream) SubscribeTopic(w http.ResponseWriter, topic string, las
 // differs from the server's last event ID, it attempts to resynchronize missing events from the cache.
 // The filter function can be used to modify or exclude events before sending them to the client.
 // Returns ErrCacheMiss if resynchronization is needed but events are not found in cache.
-func (s *LastOnlyStream) SubscribeTopicFiltered(w http.ResponseWriter, topic string, lastEventID string, f FilterFn) error {
+func (s *LastOnlyStream) SubscribeTopicFiltered(w http.ResponseWriter, r *http.Request, topic string, lastEventID string, f FilterFn) error {
 	if f != nil {
 		return errFiltersNotSupported
 	}
@@ -135,10 +135,10 @@ func (s *LastOnlyStream) SubscribeTopicFiltered(w http.ResponseWriter, topic str
 	s.RUnlock()
 
 	if len(events) > 0 {
-		return Respond(w, applyChanFilter(prependStream(events, source), f), &s.cfg, s.responseStop)
+		return RespondWithContext(r.Context(), w, applyChanFilter(prependStream(events, source), f), &s.cfg, s.responseStop)
 	}
 
-	return Respond(w, applyChanFilter(source, f), &s.cfg, s.responseStop)
+	return RespondWithContext(r.Context(), w, applyChanFilter(source, f), &s.cfg, s.responseStop)
 }
 
 // DropSubscribers closes all active connections to subscribers.
