@@ -1,6 +1,9 @@
 package sseserver
 
-import "net/http"
+import (
+	"context"
+	"net/http"
+)
 
 // Stream is an abstraction of SSE stream. Single instance of stream should be
 // created for each SSE stream available in the application. Application can
@@ -78,12 +81,12 @@ type StreamWithContext interface {
 	// the request.
 	//
 	// Subscribe on a stopped stream will cause panic.
-	Subscribe(w http.ResponseWriter, r *http.Request, lastEventID string) error
+	Subscribe(ctx context.Context, w http.ResponseWriter, lastEventID string) error
 
 	// SubscribeFiltered is similar to Subscribe but each event before being
 	// sent to client will be passed to given filtering function. Events
 	// returned by the filtering function will be used instead.
-	SubscribeFiltered(w http.ResponseWriter, r *http.Request, lastEventID string, f FilterFn) error
+	SubscribeFiltered(ctx context.Context, w http.ResponseWriter, lastEventID string, f FilterFn) error
 }
 
 // MultiStream is an abstraction of multiple SSE streams. Single instance of
@@ -171,12 +174,12 @@ type MultiStreamWithContext interface {
 	// the request.
 	//
 	// Subscribe on a stopped stream will cause panic.
-	SubscribeTopic(w http.ResponseWriter, r *http.Request, topic string, lastEventID string) error
+	SubscribeTopic(ctx context.Context, w http.ResponseWriter, topic string, lastEventID string) error
 
 	// SubscribeTopicFiltered is similar to Subscribe but each event before being
 	// sent to client will be passed to given filtering function. Events
 	// returned by the filtering function will be used instead.
-	SubscribeTopicFiltered(w http.ResponseWriter, r *http.Request, topic string, lastEventID string, f FilterFn) error
+	SubscribeTopicFiltered(ctx context.Context, w http.ResponseWriter, topic string, lastEventID string, f FilterFn) error
 }
 
 // ResyncFn is a definition of function used to lookup events missed by
