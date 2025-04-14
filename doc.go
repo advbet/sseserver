@@ -11,14 +11,14 @@
 // strategies are provided by multiple Stream interface implementations.
 //
 // Typical usage of this package is:
-// 	* Create new stream object that satisfies Stream interface with one of
-//	  the New... constructors.
-//	* Start a goroutine that generates events and publishes them via
-//	  Publish() method.
-//	* Create HTTP handlers that parses Last-Event-ID header, everything else
-//	  is handled by the Subscribe() method.
-//	* If graceful web server shutdown is required use DropSubscribers() to
-//	  gracefully disconnect all active streams.
-//      * If dynamic stream creation is required use Stop() to free resources
-//        allocated for sse stream.
+//   - Create new stream object that satisfies Stream interface with one of
+//     the New... constructors.
+//   - Start a goroutine that generates events and publishes them via
+//     Publish() method.
+//   - Create HTTP handlers that parses Last-Event-ID header, everything else
+//     is handled by the Subscribe() method.
+//   - If graceful web server shutdown is required use DropSubscribers() to
+//     gracefully disconnect all active streams.
+//   - If dynamic stream creation is required use Stop() to free resources
+//     allocated for sse stream.
 package sseserver

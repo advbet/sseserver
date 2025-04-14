@@ -8,10 +8,14 @@ import (
 	"time"
 )
 
-var _ MultiStream = &CachedCountStream{}
-var _ Stream = &CachedCountStream{}
+var (
+	_ MultiStream = &CachedCountStream{}
+	_ Stream      = &CachedCountStream{}
+)
 
 func TestCachedCountResync(t *testing.T) {
+	t.Parallel()
+
 	stream := NewCachedCount("first", Config{
 		Reconnect:   0,
 		KeepAlive:   0,
@@ -45,6 +49,8 @@ func TestCachedCountResync(t *testing.T) {
 }
 
 func TestCachedCountResyncWithBroadcast(t *testing.T) {
+	t.Parallel()
+
 	stream := NewCachedCount("first", Config{
 		Reconnect:   0,
 		KeepAlive:   0,
@@ -70,6 +76,8 @@ func TestCachedCountResyncWithBroadcast(t *testing.T) {
 }
 
 func TestCachedCountError(t *testing.T) {
+	t.Parallel()
+
 	stream := NewCachedCount("8", Config{
 		Reconnect:   0,
 		KeepAlive:   0,
@@ -87,6 +95,8 @@ func TestCachedCountError(t *testing.T) {
 }
 
 func TestCachedCountResyncTopics(t *testing.T) {
+	t.Parallel()
+
 	stream := NewCachedCountMultiStream(map[string]string{
 		"topic1": "first1",
 		"topic2": "first2",
@@ -115,6 +125,7 @@ func TestCachedCountResyncTopics(t *testing.T) {
 		_ = stream.SubscribeTopic(w, "topic1", "first1")
 		assertReceivedEvents(t, w, events1...)
 	})
+
 	t.Run("with topic2", func(t *testing.T) {
 		w := httptest.NewRecorder()
 		_ = stream.SubscribeTopic(w, "topic2", "first2")
