@@ -349,6 +349,7 @@ func applyChanFilter(input <-chan *Event, f FilterFn) <-chan *Event {
 func applySliceFilter(events []Event, f FilterFn) []Event {
 	result := make([]Event, 0)
 
+	//nolint:gosec
 	for _, event := range events {
 		if e := f(&event); e != nil {
 			result = append(result, *e)
