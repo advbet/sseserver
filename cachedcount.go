@@ -1,6 +1,7 @@
 package sseserver
 
 import (
+	"context"
 	"net/http"
 	"sync"
 )
@@ -95,16 +96,16 @@ func (s *CachedCountStream) PublishBroadcast(event *Event) {
 // differs from the server's last event ID, it attempts to resynchronize
 // missing events from the cache.
 // Returns ErrCacheMiss if resynchronization is needed but events are not found in cache.
-func (s *CachedCountStream) Subscribe(w http.ResponseWriter, lastClientID string) error {
-	return s.SubscribeTopicFiltered(w, "", lastClientID, nil)
+func (s *CachedCountStream) Subscribe(ctx context.Context, w http.ResponseWriter, lastClientID string) error {
+	return s.SubscribeTopicFiltered(ctx, w, "", lastClientID, nil)
 }
 
 // SubscribeFiltered adds a subscriber to the default topic ("") with event filtering
 // and starts sending events to the provided response writer. The filter function
 // can be used to modify or exclude events before sending them to the client.
 // Returns ErrCacheMiss if resynchronization is needed but events are not found in cache.
-func (s *CachedCountStream) SubscribeFiltered(w http.ResponseWriter, lastClientID string, f FilterFn) error {
-	return s.SubscribeTopicFiltered(w, "", lastClientID, f)
+func (s *CachedCountStream) SubscribeFiltered(ctx context.Context, w http.ResponseWriter, lastClientID string, f FilterFn) error {
+	return s.SubscribeTopicFiltered(ctx, w, "", lastClientID, f)
 }
 
 // SubscribeTopic adds a subscriber to the specified topic and starts sending
@@ -112,8 +113,8 @@ func (s *CachedCountStream) SubscribeFiltered(w http.ResponseWriter, lastClientI
 // differs from the server's last event ID, it attempts to resynchronize
 // missing events from the cache.
 // Returns ErrCacheMiss if resynchronization is needed but events are not found in cache.
-func (s *CachedCountStream) SubscribeTopic(w http.ResponseWriter, topic string, lastClientID string) error {
-	return s.SubscribeTopicFiltered(w, topic, lastClientID, nil)
+func (s *CachedCountStream) SubscribeTopic(ctx context.Context, w http.ResponseWriter, topic string, lastClientID string) error {
+	return s.SubscribeTopicFiltered(ctx, w, topic, lastClientID, nil)
 }
 
 // SubscribeTopicFiltered adds a subscriber to the specified topic with event filtering
@@ -121,14 +122,14 @@ func (s *CachedCountStream) SubscribeTopic(w http.ResponseWriter, topic string, 
 // differs from the server's last event ID, it attempts to resynchronize missing events from the cache.
 // The filter function can be used to modify or exclude events before sending them to the client.
 // Returns ErrCacheMiss if resynchronization is needed but events are not found in cache.
-func (s *CachedCountStream) SubscribeTopicFiltered(w http.ResponseWriter, topic string, lastClientID string, f FilterFn) error {
+func (s *CachedCountStream) SubscribeTopicFiltered(ctx context.Context, w http.ResponseWriter, topic string, lastClientID string, f FilterFn) error {
 	source := make(chan *Event, s.cfg.QueueLength)
 	lastServerID := s.broker.subscribe(topic, source)
 	defer s.broker.unsubscribe(source)
 
 	if lastClientID == "" || lastClientID == lastServerID {
 		// no resync needed
-		return Respond(w, applyChanFilter(source, f), &s.cfg, s.responseStop)
+		return Respond(ctx, w, applyChanFilter(source, f), &s.cfg, s.responseStop)
 	}
 
 	var events []Event
@@ -151,11 +152,10 @@ func (s *CachedCountStream) SubscribeTopicFiltered(w http.ResponseWriter, topic 
 	}
 	s.mu.RUnlock()
 
-	return Respond(w, applyChanFilter(prependStream(events, source), f), &s.cfg, s.responseStop)
+	return Respond(ctx, w, applyChanFilter(prependStream(events, source), f), &s.cfg, s.responseStop)
 }
 
-// DropSubscribers closes all active connections to subscribers.
-// This forces clients to reconnect, which can be useful when server state changes.
+// DropSubscribers removes all currently active stream subscribers and close all active HTTP responses.
 func (s *CachedCountStream) DropSubscribers() {
 	close(s.responseStop)
 }

@@ -1,6 +1,7 @@
 package sseserver
 
 import (
+	"context"
 	"errors"
 	"net/http/httptest"
 	"testing"
@@ -13,7 +14,7 @@ var (
 )
 
 func resyncGenerator(events []Event, err error) ResyncFn {
-	return func(topic string, fromID, toID string) ([]Event, error) {
+	return func(ctx context.Context, topic string, fromID, toID string) ([]Event, error) {
 		return events, err
 	}
 }
@@ -33,7 +34,7 @@ func TestGenericDisconnect(t *testing.T) {
 
 	w := httptest.NewRecorder()
 
-	err := stream.Subscribe(w, "first")
+	err := stream.Subscribe(t.Context(), w, "first")
 	if !errors.Is(err, resyncErr) {
 		t.Errorf("Expected error %v, got %v", resyncErr, err)
 	}
@@ -53,7 +54,7 @@ func TestGenericResyncThreshold(t *testing.T) {
 	defer stream.Stop()
 
 	w := httptest.NewRecorder()
-	_ = stream.Subscribe(w, "")
+	_ = stream.Subscribe(t.Context(), w, "")
 	assertReceivedEvents(t, w, expected...)
 }
 
@@ -63,7 +64,7 @@ func TestGenericResyncBeforeDisconnect(t *testing.T) {
 	expected := []Event{{ID: "1"}, {ID: "2"}}
 	var synced bool
 	errSynced := errors.New("synced")
-	resync := func(topic string, fromID, toID string) ([]Event, error) {
+	resync := func(ctx context.Context, topic string, fromID, toID string) ([]Event, error) {
 		if !synced {
 			synced = true
 			return expected, nil
@@ -81,7 +82,7 @@ func TestGenericResyncBeforeDisconnect(t *testing.T) {
 
 	// Get resynced events
 	w1 := httptest.NewRecorder()
-	err1 := stream.Subscribe(w1, "")
+	err1 := stream.Subscribe(t.Context(), w1, "")
 	if err1 != nil {
 		t.Errorf("Expected nil error, got %v", err1)
 	}
@@ -89,7 +90,7 @@ func TestGenericResyncBeforeDisconnect(t *testing.T) {
 
 	// Client reconnects after resync
 	w2 := httptest.NewRecorder()
-	err2 := stream.Subscribe(w2, "2")
+	err2 := stream.Subscribe(t.Context(), w2, "2")
 	if !errors.Is(err2, errSynced) {
 		t.Errorf("Expected error %v, got %v", errSynced, err2)
 	}
@@ -100,7 +101,7 @@ func TestGenericInitialLastEventID(t *testing.T) {
 
 	initialID := "15"
 	var actualID string
-	resync := func(topic string, fromID, toID string) ([]Event, error) {
+	resync := func(ctx context.Context, topic string, fromID, toID string) ([]Event, error) {
 		actualID = toID
 		return nil, nil
 	}
@@ -114,7 +115,7 @@ func TestGenericInitialLastEventID(t *testing.T) {
 	defer stream.Stop()
 
 	w := httptest.NewRecorder()
-	_ = stream.Subscribe(w, "")
+	_ = stream.Subscribe(t.Context(), w, "")
 	assertReceivedEvents(t, w)
 	if actualID != initialID {
 		t.Errorf("Expected ID %s, got %s", initialID, actualID)
@@ -126,7 +127,7 @@ func TestGenericResyncTopic(t *testing.T) {
 
 	const topic = "some-topic"
 	var receivedTopic string
-	resync := func(topic string, fromID, toID string) ([]Event, error) {
+	resync := func(ctx context.Context, topic string, fromID, toID string) ([]Event, error) {
 		receivedTopic = topic
 		return nil, nil
 	}
@@ -140,7 +141,7 @@ func TestGenericResyncTopic(t *testing.T) {
 	defer stream.Stop()
 
 	w := httptest.NewRecorder()
-	_ = stream.SubscribeTopic(w, topic, "0")
+	_ = stream.SubscribeTopic(t.Context(), w, topic, "0")
 	assertReceivedEvents(t, w)
 	if receivedTopic != topic {
 		t.Errorf("resync function received wrong topic: expected %s, got %s", topic, receivedTopic)

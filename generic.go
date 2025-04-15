@@ -1,6 +1,7 @@
 package sseserver
 
 import (
+	"context"
 	"net/http"
 	"sync"
 )
@@ -71,16 +72,16 @@ func (s *GenericStream) PublishBroadcast(event *Event) {
 // differs from the server's last event ID, it attempts to resynchronize
 // missing events from the cache.
 // Returns ErrCacheMiss if resynchronization is needed but events are not found in cache.
-func (s *GenericStream) Subscribe(w http.ResponseWriter, lastEventID string) error {
-	return s.SubscribeTopicFiltered(w, "", lastEventID, nil)
+func (s *GenericStream) Subscribe(ctx context.Context, w http.ResponseWriter, lastEventID string) error {
+	return s.SubscribeTopicFiltered(ctx, w, "", lastEventID, nil)
 }
 
 // SubscribeFiltered adds a subscriber to the default topic ("") with event filtering
 // and starts sending events to the provided response writer. The filter function
 // can be used to modify or exclude events before sending them to the client.
 // Returns ErrCacheMiss if resynchronization is needed but events are not found in cache.
-func (s *GenericStream) SubscribeFiltered(w http.ResponseWriter, lastEventID string, f FilterFn) error {
-	return s.SubscribeTopicFiltered(w, "", lastEventID, f)
+func (s *GenericStream) SubscribeFiltered(ctx context.Context, w http.ResponseWriter, lastEventID string, f FilterFn) error {
+	return s.SubscribeTopicFiltered(ctx, w, "", lastEventID, f)
 }
 
 // SubscribeTopic adds a subscriber to the specified topic and starts sending
@@ -88,8 +89,8 @@ func (s *GenericStream) SubscribeFiltered(w http.ResponseWriter, lastEventID str
 // differs from the server's last event ID, it attempts to resynchronize
 // missing events from the cache.
 // Returns ErrCacheMiss if resynchronization is needed but events are not found in cache.
-func (s *GenericStream) SubscribeTopic(w http.ResponseWriter, topic string, lastEventID string) error {
-	return s.SubscribeTopicFiltered(w, topic, lastEventID, nil)
+func (s *GenericStream) SubscribeTopic(ctx context.Context, w http.ResponseWriter, topic string, lastEventID string) error {
+	return s.SubscribeTopicFiltered(ctx, w, topic, lastEventID, nil)
 }
 
 // SubscribeTopicFiltered adds a subscriber to the specified topic with event filtering
@@ -97,7 +98,7 @@ func (s *GenericStream) SubscribeTopic(w http.ResponseWriter, topic string, last
 // differs from the server's last event ID, it attempts to resynchronize missing events from the cache.
 // The filter function can be used to modify or exclude events before sending them to the client.
 // Returns ErrCacheMiss if resynchronization is needed but events are not found in cache.
-func (s *GenericStream) SubscribeTopicFiltered(w http.ResponseWriter, topic string, lastEventID string, f FilterFn) error {
+func (s *GenericStream) SubscribeTopicFiltered(ctx context.Context, w http.ResponseWriter, topic string, lastEventID string, f FilterFn) error {
 	source := make(chan *Event, s.cfg.QueueLength)
 	toID := s.broker.subscribe(topic, source)
 	defer s.broker.unsubscribe(source)
@@ -106,17 +107,17 @@ func (s *GenericStream) SubscribeTopicFiltered(w http.ResponseWriter, topic stri
 	// lastEventID will be nil if client connects for the first time
 	// serverID will be nil if server did not send any events yet
 	for len(events) <= s.cfg.ResyncEventsThreshold {
-		list, err := s.resync(topic, lastEventID, toID)
+		list, err := s.resync(ctx, topic, lastEventID, toID)
 		if err != nil {
 			if len(events) > 0 {
-				return Respond(w, prependStream(events, nil), &s.cfg, s.responseStop)
+				return Respond(ctx, w, prependStream(events, nil), &s.cfg, s.responseStop)
 			}
 
 			return err
 		}
 
 		if len(list) == 0 {
-			return Respond(w, prependStream(events, applyChanFilter(source, f)), &s.cfg, s.responseStop)
+			return Respond(ctx, w, prependStream(events, applyChanFilter(source, f)), &s.cfg, s.responseStop)
 		}
 
 		switch f {
@@ -129,11 +130,10 @@ func (s *GenericStream) SubscribeTopicFiltered(w http.ResponseWriter, topic stri
 		lastEventID = list[len(list)-1].ID
 	}
 
-	return Respond(w, prependStream(events, nil), &s.cfg, s.responseStop)
+	return Respond(ctx, w, prependStream(events, nil), &s.cfg, s.responseStop)
 }
 
-// DropSubscribers closes all active connections to subscribers.
-// This forces clients to reconnect, which can be useful when server state changes.
+// DropSubscribers removes all currently active stream subscribers and close all active HTTP responses.
 func (s *GenericStream) DropSubscribers() {
 	close(s.responseStop)
 }

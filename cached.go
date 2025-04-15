@@ -246,16 +246,16 @@ func (s *CachedStream) PublishBroadcast(event *Event) {
 // differs from the server's last event ID, it attempts to resynchronize
 // missing events from the cache.
 // Returns ErrCacheMiss if resynchronization is needed but events are not found in cache.
-func (s *CachedStream) Subscribe(w http.ResponseWriter, lastClientID string) error {
-	return s.SubscribeTopicFiltered(w, "", lastClientID, nil)
+func (s *CachedStream) Subscribe(ctx context.Context, w http.ResponseWriter, lastClientID string) error {
+	return s.SubscribeTopicFiltered(ctx, w, "", lastClientID, nil)
 }
 
 // SubscribeFiltered adds a subscriber to the default topic ("") with event filtering
 // and starts sending events to the provided response writer. The filter function
 // can be used to modify or exclude events before sending them to the client.
 // Returns ErrCacheMiss if resynchronization is needed but events are not found in cache.
-func (s *CachedStream) SubscribeFiltered(w http.ResponseWriter, lastClientID string, f FilterFn) error {
-	return s.SubscribeTopicFiltered(w, "", lastClientID, f)
+func (s *CachedStream) SubscribeFiltered(ctx context.Context, w http.ResponseWriter, lastClientID string, f FilterFn) error {
+	return s.SubscribeTopicFiltered(ctx, w, "", lastClientID, f)
 }
 
 // SubscribeTopic adds a subscriber to the specified topic and starts sending
@@ -263,8 +263,8 @@ func (s *CachedStream) SubscribeFiltered(w http.ResponseWriter, lastClientID str
 // differs from the server's last event ID, it attempts to resynchronize
 // missing events from the cache.
 // Returns ErrCacheMiss if resynchronization is needed but events are not found in cache.
-func (s *CachedStream) SubscribeTopic(w http.ResponseWriter, topic string, lastClientID string) error {
-	return s.SubscribeTopicFiltered(w, topic, lastClientID, nil)
+func (s *CachedStream) SubscribeTopic(ctx context.Context, w http.ResponseWriter, topic string, lastClientID string) error {
+	return s.SubscribeTopicFiltered(ctx, w, topic, lastClientID, nil)
 }
 
 // SubscribeTopicFiltered adds a subscriber to the specified topic with event filtering
@@ -272,14 +272,14 @@ func (s *CachedStream) SubscribeTopic(w http.ResponseWriter, topic string, lastC
 // differs from the server's last event ID, it attempts to resynchronize missing events from the cache.
 // The filter function can be used to modify or exclude events before sending them to the client.
 // Returns ErrCacheMiss if resynchronization is needed but events are not found in cache.
-func (s *CachedStream) SubscribeTopicFiltered(w http.ResponseWriter, topic string, lastClientID string, filter FilterFn) error {
+func (s *CachedStream) SubscribeTopicFiltered(ctx context.Context, w http.ResponseWriter, topic string, lastClientID string, filter FilterFn) error {
 	source := make(chan *Event, s.cfg.QueueLength)
 	lastServerID := s.broker.subscribe(topic, source)
 	defer s.broker.unsubscribe(source)
 
 	if lastClientID == "" || lastClientID == lastServerID {
 		// no resync needed
-		return Respond(w, applyChanFilter(source, filter), &s.cfg, s.responseStop)
+		return Respond(ctx, w, applyChanFilter(source, filter), &s.cfg, s.responseStop)
 	}
 
 	events, miss := s.cache.get(
@@ -296,14 +296,13 @@ func (s *CachedStream) SubscribeTopicFiltered(w http.ResponseWriter, topic strin
 	}
 
 	if len(events) == 0 || lastServerID == events[len(events)-1].ID {
-		return Respond(w, prependStream(events, applyChanFilter(source, filter)), &s.cfg, s.responseStop)
+		return Respond(ctx, w, prependStream(events, applyChanFilter(source, filter)), &s.cfg, s.responseStop)
 	}
 
-	return Respond(w, prependStream(events, nil), &s.cfg, s.responseStop)
+	return Respond(ctx, w, prependStream(events, nil), &s.cfg, s.responseStop)
 }
 
-// DropSubscribers closes all active connections to subscribers.
-// This forces clients to reconnect, which can be useful when server state changes.
+// DropSubscribers removes all currently active stream subscribers and close all active HTTP responses.
 func (s *CachedStream) DropSubscribers() {
 	close(s.responseStop)
 }

@@ -136,14 +136,13 @@ func (s *LastOnlyStream) SubscribeTopicFiltered(ctx context.Context, w http.Resp
 	s.RUnlock()
 
 	if len(events) > 0 {
-		return RespondWithContext(ctx, w, applyChanFilter(prependStream(events, source), f), &s.cfg, s.responseStop)
+		return Respond(ctx, w, applyChanFilter(prependStream(events, source), f), &s.cfg, s.responseStop)
 	}
 
-	return RespondWithContext(ctx, w, applyChanFilter(source, f), &s.cfg, s.responseStop)
+	return Respond(ctx, w, applyChanFilter(source, f), &s.cfg, s.responseStop)
 }
 
-// DropSubscribers closes all active connections to subscribers.
-// This forces clients to reconnect, which can be useful when server state changes.
+// DropSubscribers removes all currently active stream subscribers and close all active HTTP responses.
 func (s *LastOnlyStream) DropSubscribers() {
 	close(s.responseStop)
 }

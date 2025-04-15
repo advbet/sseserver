@@ -72,108 +72,7 @@ func drain(source <-chan *Event) {
 	}()
 }
 
-// Respond reads Events from a channel and writes SSE HTTP response. function
-// provides a lower level API that allows manually generating SSE stream. In
-// most cases this function should not be used directly.
-//
-// Cfg is SSE stream configuration, if nil is passed configuration from
-// DefaultConfiguration global will be used.
-//
-// Stop is an optional channel for stopping SSE stream, if this channel is
-// closed SSE stream will stop and http connection closed. If stream stopping
-// functionality is not required Stop should be set to nil.
-//
-// This function returns nil if end of stream is reached, stream lifetime
-// expired, client closes the connection or request to stop is received on the
-// stop channel. Otherwise, it returns an error.
-//
-// Note! After passing source channel to Stream it cannot be reused (for example
-// passed to the Stream function again). This function will drain source channel
-// on exit.
-func Respond(w http.ResponseWriter, source <-chan *Event, cfg *Config, stop <-chan struct{}) error {
-	// Draining the source stream can help protect against resource leaks if
-	// too small source chan buffer size was used and producer is stuck on
-	// trying to send more data. It has a downside that source channel will
-	// become useless after call to Stream.
-	defer drain(source)
-
-	if cfg == nil {
-		cfg = &DefaultConfig
-	}
-
-	flusher, ok := w.(http.Flusher)
-	if !ok {
-		panic(errFlusherIface)
-	}
-
-	var closeChan <-chan bool
-	//nolint:staticcheck
-	if notifier, ok := w.(http.CloseNotifier); ok {
-		closeChan = notifier.CloseNotify()
-	}
-
-	var timeoutChan <-chan time.Time
-	if cfg.Lifetime > 0 {
-		timeoutChan = time.After(cfg.Lifetime)
-	}
-
-	var keepaliveChan <-chan time.Time
-
-	if cfg.KeepAlive > 0 {
-		ticker := time.NewTicker(cfg.KeepAlive)
-		defer ticker.Stop()
-		keepaliveChan = ticker.C
-	}
-
-	w.Header().Set("Content-Type", "text/event-stream; charset=utf-8")
-	w.Header().Set("Cache-Control", "no-cache")
-	// Instruct nginx to disable buffering
-	w.Header().Set("X-Accel-Buffering", "no")
-
-	if cfg.Reconnect != 0 {
-		if _, err := fmt.Fprintf(w, "retry: %d\n\n", cfg.Reconnect/time.Millisecond); err != nil {
-			return err
-		}
-
-		flusher.Flush()
-	}
-
-loop:
-	for {
-		select {
-		case <-timeoutChan:
-			// Stream lifetime has ended, client should reconnect
-			break loop
-		case <-stop:
-			// Caller requests to stop serving SSE stream
-			break loop
-		case <-closeChan:
-			// Client closed the connection
-			break loop
-		case <-keepaliveChan:
-			if _, err := io.WriteString(w, ":keep-alive\n\n"); err != nil {
-				return err
-			}
-
-			flusher.Flush()
-		case event, ok := <-source:
-			if !ok {
-				// Source is drained
-				break loop
-			}
-
-			if err := write(w, event); err != nil {
-				return err
-			}
-
-			flusher.Flush()
-		}
-	}
-
-	return nil
-}
-
-// RespondWithContext reads Events from a channel and writes SSE HTTP response,
+// Respond reads Events from a channel and writes SSE HTTP response,
 // with context awareness for proper connection handling. This allows for graceful
 // termination when the client disconnects or the request is canceled.
 //
@@ -188,7 +87,7 @@ loop:
 // This function returns nil if end of stream is reached, stream lifetime
 // expired, client closes the connection or request to stop is received on the
 // stop channel. Otherwise, it returns an error.
-func RespondWithContext(ctx context.Context, w http.ResponseWriter, source <-chan *Event, cfg *Config, stop <-chan struct{}) error {
+func Respond(ctx context.Context, w http.ResponseWriter, source <-chan *Event, cfg *Config, stop <-chan struct{}) error {
 	// Create a merged cancellation context that incorporates the stop channel
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel() // Ensure resources are cleaned up
@@ -199,8 +98,7 @@ func RespondWithContext(ctx context.Context, w http.ResponseWriter, source <-cha
 			select {
 			case <-stop:
 				cancel()
-			case <-ctx.Done():
-				// Context already done, nothing to do
+			case <-ctx.Done(): // Context already done, nothing to do
 			}
 		}()
 	}
@@ -226,6 +124,7 @@ func RespondWithContext(ctx context.Context, w http.ResponseWriter, source <-cha
 	}
 
 	var keepaliveChan <-chan time.Time
+
 	if cfg.KeepAlive > 0 {
 		ticker := time.NewTicker(cfg.KeepAlive)
 		defer ticker.Stop()
@@ -349,7 +248,6 @@ func applyChanFilter(input <-chan *Event, f FilterFn) <-chan *Event {
 func applySliceFilter(events []Event, f FilterFn) []Event {
 	result := make([]Event, 0)
 
-	//nolint:gosec
 	for _, event := range events {
 		if e := f(&event); e != nil {
 			result = append(result, *e)

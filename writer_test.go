@@ -2,6 +2,7 @@ package sseserver
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -18,7 +19,7 @@ func (w writerNotFlusher) WriteHeader(int)           {}
 
 func recordResponse(t *testing.T, source <-chan *Event, c *Config, stop <-chan struct{}) *httptest.ResponseRecorder {
 	w := httptest.NewRecorder()
-	err := Respond(w, source, c, stop)
+	err := Respond(t.Context(), w, source, c, stop)
 	if err != nil {
 		t.Errorf("Expected nil error, got %v", err)
 	}
@@ -30,13 +31,10 @@ func TestRespondWithoutFlusher(t *testing.T) {
 
 	var w writerNotFlusher
 
-	defer func() {
-		if r := recover(); r == nil {
-			t.Error("Expected panic when using non-flusher writer, but no panic occurred")
-		}
-	}()
-
-	_ = Respond(w, make(<-chan *Event), nil, nil)
+	err := Respond(t.Context(), w, make(<-chan *Event), nil, nil)
+	if err == nil {
+		t.Errorf("Expected error, got nil")
+	}
 }
 
 func TestRespondReconnect(t *testing.T) {
@@ -151,26 +149,22 @@ func TestRespondWrite(t *testing.T) {
 	}
 }
 
-type customResponseRecorder struct {
-	closeChan chan bool
-	*httptest.ResponseRecorder
-}
-
-func (rw *customResponseRecorder) CloseNotify() <-chan bool { return rw.closeChan }
-
 func TestRespondCloseNotify(t *testing.T) {
 	t.Parallel()
 
 	source := make(chan *Event)
-	// Close source after 1 second if client close does not work
+	// Close source after 1 second if context timeout doesn't work
 	time.AfterFunc(1*time.Second, func() { close(source) })
 
-	w := &customResponseRecorder{make(chan bool, 1), httptest.NewRecorder()}
+	w := httptest.NewRecorder()
 	closeTimeout := 50 * time.Millisecond
-	time.AfterFunc(closeTimeout, func() { w.closeChan <- true })
+
+	// Create a context that will automatically cancel after closeTimeout
+	ctx, cancel := context.WithTimeout(t.Context(), closeTimeout)
+	defer cancel()
 
 	start := time.Now()
-	_ = Respond(w, source, &Config{}, nil)
+	_ = Respond(ctx, w, source, &Config{}, nil)
 	end := time.Now()
 
 	if duration := end.Sub(start); duration > closeTimeout*2 {

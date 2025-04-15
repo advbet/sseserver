@@ -84,7 +84,7 @@ func TestCachedResync(t *testing.T) {
 
 	w := httptest.NewRecorder()
 	// connect with initial last event ID to receive both cached events
-	_ = stream.Subscribe(w, "first")
+	_ = stream.Subscribe(t.Context(), w, "first")
 
 	// Assert both events were received
 	assertReceivedEvents(t, w, event1, event2)
@@ -112,7 +112,7 @@ func TestCachedResyncWithBroadcast(t *testing.T) {
 	w := httptest.NewRecorder()
 	// connect with initial last event ID to receive both cached events,
 	// broadcasted event should be excluded
-	_ = stream.Subscribe(w, "first")
+	_ = stream.Subscribe(t.Context(), w, "first")
 
 	// Assert both events were received
 	assertReceivedEvents(t, w, event1, event2)
@@ -131,7 +131,7 @@ func TestCachedError(t *testing.T) {
 
 	w := httptest.NewRecorder()
 	// resyncing from non-existent event ID should return error
-	err := stream.Subscribe(w, "non-existent")
+	err := stream.Subscribe(t.Context(), w, "non-existent")
 	if !errors.Is(err, ErrCacheMiss) {
 		t.Errorf("Expected error: %v, got: %v", ErrCacheMiss, err)
 	}
@@ -167,13 +167,13 @@ func TestCachedResyncTopics(t *testing.T) {
 
 	t.Run("with topic1", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		_ = stream.SubscribeTopic(w, "topic1", "first1")
+		_ = stream.SubscribeTopic(t.Context(), w, "topic1", "first1")
 		assertReceivedEvents(t, w, events1...)
 	})
 
 	t.Run("with topic2", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		_ = stream.SubscribeTopic(w, "topic2", "first2")
+		_ = stream.SubscribeTopic(t.Context(), w, "topic2", "first2")
 		assertReceivedEvents(t, w, events2...)
 	})
 }
