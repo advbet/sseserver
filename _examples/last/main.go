@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/advbet/sseserver"
+	"github.com/advbet/sseserver/v2"
 )
 
 func newEvent(topic string, id string) *sseserver.Event {
@@ -40,7 +40,7 @@ func main() {
 			fmt.Println(err)
 		}
 
-		if err = stream.Subscribe(w, r.Header.Get("Last-Event-ID")); err != nil {
+		if err = stream.Subscribe(r.Context(), w, r.Header.Get("Last-Event-ID")); err != nil {
 			fmt.Println(err)
 		}
 	}

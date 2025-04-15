@@ -29,7 +29,7 @@ func main() {
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		id := r.Header.Get("Last-Event-ID")
-		if err := stream.Subscribe(w, id); err != nil {
+		if err := stream.Subscribe(r.Context(), w, id); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 	})

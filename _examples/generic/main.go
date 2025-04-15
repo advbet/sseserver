@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -21,7 +22,12 @@ func newEvent(topic string, id string) *sseserver.Event {
 	}
 }
 
-func lookupEvents(topic string, fromStr string, toStr string) ([]sseserver.Event, error) {
+func lookupEvents(ctx context.Context, topic string, fromStr string, toStr string) ([]sseserver.Event, error) {
+	if ctx.Err() != nil {
+		// Client disconnected
+		return nil, nil
+	}
+
 	if fromStr == "" {
 		// New client
 		// no resync, continue sending live events
@@ -64,7 +70,7 @@ func lookupEvents(topic string, fromStr string, toStr string) ([]sseserver.Event
 	}
 }
 
-func eventGenerator(stream sseserver.StreamWithContext) {
+func eventGenerator(stream sseserver.Stream) {
 	i := 0
 	c := time.Tick(time.Second)
 
@@ -84,7 +90,7 @@ func main() {
 			fmt.Println(err)
 		}
 
-		if err = stream.Subscribe(w, r, r.Header.Get("Last-Event-ID")); err != nil {
+		if err = stream.Subscribe(r.Context(), w, r.Header.Get("Last-Event-ID")); err != nil {
 			fmt.Println(err)
 		}
 	}
