@@ -149,7 +149,7 @@ func TestRespondWrite(t *testing.T) {
 	}
 }
 
-func TestRespondCloseNotify(t *testing.T) {
+func TestRespondContextCancel(t *testing.T) {
 	t.Parallel()
 
 	source := make(chan *Event)
