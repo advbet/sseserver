@@ -1,9 +1,11 @@
 # sseserver
 
-
 [![Godoc](https://godoc.org/bitbucket.org/advbet/sseserver?status.svg)](https://godoc.org/bitbucket.org/advbet/sseserver)
 
 This is a golang library for creating web services that generate streams of
 [Server-Sent Events](https://www.w3.org/TR/eventsource/ "SSE").
 
-For example usage see `_example/` directory.
+For examples see `_examples/` directory.
+
+**NOTE:** Make sure your HTTP server `WriteTimeout` is bigger than Stream `Lifetime`, otherwise connections will be
+closed from HTTP server side and front will not be able to receive events.

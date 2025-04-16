@@ -23,13 +23,13 @@ func TestGenericDisconnect(t *testing.T) {
 	t.Parallel()
 
 	resyncErr := errors.New("error")
-	stream := NewGeneric(resyncGenerator(nil, resyncErr), "first", Config{
+	stream := NewGeneric(Config{
 		Reconnect:             0,
 		KeepAlive:             0,
 		Lifetime:              10 * time.Millisecond,
 		QueueLength:           32,
 		ResyncEventsThreshold: 10000,
-	})
+	}, resyncGenerator(nil, resyncErr), "first")
 	defer stream.Stop()
 
 	w := httptest.NewRecorder()
@@ -44,13 +44,13 @@ func TestGenericResyncThreshold(t *testing.T) {
 	t.Parallel()
 
 	expected := []Event{{ID: "1"}, {ID: "2"}}
-	stream := NewGeneric(resyncGenerator(expected, nil), "first", Config{
+	stream := NewGeneric(Config{
 		Reconnect:             0,
 		KeepAlive:             0,
 		Lifetime:              10 * time.Millisecond,
 		QueueLength:           32,
 		ResyncEventsThreshold: 1,
-	})
+	}, resyncGenerator(expected, nil), "first")
 	defer stream.Stop()
 
 	w := httptest.NewRecorder()
@@ -71,13 +71,13 @@ func TestGenericResyncBeforeDisconnect(t *testing.T) {
 		}
 		return nil, errSynced
 	}
-	stream := NewGeneric(resync, "first", Config{
+	stream := NewGeneric(Config{
 		Reconnect:             0,
 		KeepAlive:             0,
 		Lifetime:              10 * time.Millisecond,
 		QueueLength:           32,
 		ResyncEventsThreshold: 5,
-	})
+	}, resync, "first")
 	defer stream.Stop()
 
 	// Get resynced events
@@ -105,13 +105,13 @@ func TestGenericInitialLastEventID(t *testing.T) {
 		actualID = toID
 		return nil, nil
 	}
-	stream := NewGeneric(resync, initialID, Config{
+	stream := NewGeneric(Config{
 		Reconnect:             0,
 		KeepAlive:             0,
 		Lifetime:              10 * time.Millisecond,
 		QueueLength:           32,
 		ResyncEventsThreshold: 10000,
-	})
+	}, resync, initialID)
 	defer stream.Stop()
 
 	w := httptest.NewRecorder()
@@ -131,13 +131,13 @@ func TestGenericResyncTopic(t *testing.T) {
 		receivedTopic = topic
 		return nil, nil
 	}
-	stream := NewGeneric(resync, "first", Config{
+	stream := NewGeneric(Config{
 		Reconnect:             0,
 		KeepAlive:             0,
 		Lifetime:              10 * time.Millisecond,
 		QueueLength:           32,
 		ResyncEventsThreshold: 10000,
-	})
+	}, resync, "first")
 	defer stream.Stop()
 
 	w := httptest.NewRecorder()

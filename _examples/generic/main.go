@@ -81,7 +81,7 @@ func eventGenerator(stream sseserver.Stream) {
 }
 
 func main() {
-	stream := sseserver.NewGeneric(lookupEvents, "0", sseserver.DefaultConfig)
+	stream := sseserver.NewGeneric(sseserver.DefaultConfig, lookupEvents, "0")
 	go eventGenerator(stream)
 
 	requestHandler := func(w http.ResponseWriter, r *http.Request) {

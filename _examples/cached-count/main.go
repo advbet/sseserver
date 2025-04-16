@@ -24,7 +24,7 @@ func eventSource(stream sseserver.Stream) {
 }
 
 func main() {
-	stream := sseserver.NewCachedCount("", sseserver.DefaultConfig, 5)
+	stream := sseserver.NewCachedCount(sseserver.DefaultConfig, "", 5)
 	go eventSource(stream)
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {

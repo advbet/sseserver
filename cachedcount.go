@@ -32,13 +32,13 @@ type CachedCountStream struct {
 // this library is responsible for generating HTTP response to the client. It is
 // recommended to return 204 no content response to stop client from
 // reconnecting until he syncs event state manually.
-func NewCachedCount(lastID string, cfg Config, size int) *CachedCountStream {
-	return NewCachedCountMultiStream(map[string]string{"": lastID}, cfg, size)
+func NewCachedCount(cfg Config, lastID string, size int) *CachedCountStream {
+	return NewCachedCountMultiStream(cfg, map[string]string{"": lastID}, size)
 }
 
 // NewCachedCountMultiStream is similar to NewCachedCount but allows setting initial last
 // event ID values for multiple topics.
-func NewCachedCountMultiStream(lastIDs map[string]string, cfg Config, size int) *CachedCountStream {
+func NewCachedCountMultiStream(cfg Config, lastIDs map[string]string, size int) *CachedCountStream {
 	s := &CachedCountStream{
 		broker:       newBroker(),
 		cfg:          cfg,
