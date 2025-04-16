@@ -37,17 +37,5 @@ jobs:
       - name: Test
         run: go test -v -race -failfast -timeout 60s ./...
 
-      - name: Build cached example
-        run: go build -C _examples/cached .
-
-      - name: Build cached-count example
-        run: go build -C _examples/cached-count .
-
-      - name: Build generic example
-        run: go build -C _examples/generic .
-
-      - name: Build last-only example
-        run: go build -C _examples/last-only .
-
       - name: Build example
-        run: go build -C _examples/complex .
+        run: go build -C _examples/ .
