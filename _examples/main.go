@@ -58,10 +58,11 @@ func run() error {
 	mux.HandleFunc("/sse/generic", genericHandler)
 	mux.HandleFunc("/sse/last-only", lastOnlyHandler)
 
+	// Note: Default WriteTimeout is 0, which means there will be no timeout
+	// otherwise you need to make it bigger than the KeepAlive time.
 	srv := &http.Server{
-		Addr:              ":8000",
-		Handler:           mux,
-		ReadHeaderTimeout: time.Second * 10,
+		Addr:    ":8000",
+		Handler: mux,
 	}
 	srv.RegisterOnShutdown(func() {
 		cachedStream.DropSubscribers()
