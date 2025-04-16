@@ -48,3 +48,6 @@ jobs:
 
       - name: Build last-only example
         run: go build -C _examples/last-only .
+
+      - name: Build example
+        run: go build -C _examples/complex .

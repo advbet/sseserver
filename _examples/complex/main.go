@@ -40,13 +40,13 @@ func run() error {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
-	cachedStream = sseserver.NewCached("", sseserver.DefaultConfig, 5*time.Minute, time.Minute)
+	cachedStream = sseserver.NewCached(sseserver.DefaultConfig, "", 5*time.Minute, time.Minute)
 	defer cachedStream.Stop()
 
-	cachedCountStream = sseserver.NewCachedCount("", sseserver.DefaultConfig, 5)
+	cachedCountStream = sseserver.NewCachedCount(sseserver.DefaultConfig, "", 5)
 	defer cachedCountStream.Stop()
 
-	genericStream = sseserver.NewGeneric(lookupEvents, "0", sseserver.DefaultConfig)
+	genericStream = sseserver.NewGeneric(sseserver.DefaultConfig, lookupEvents, "0")
 	defer genericStream.Stop()
 
 	lastOnlyStream = sseserver.NewLastOnly(sseserver.DefaultConfig)
