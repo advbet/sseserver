@@ -108,8 +108,7 @@ func TestBrokerStop(t *testing.T) {
 	}
 }
 
-// TestBrokerPublish checks if published event is broadcasted to all of the
-// subscribers.
+// TestBrokerPublish checks if published event is broadcasted to all the subscribers.
 func TestBrokerPublish(t *testing.T) {
 	t.Parallel()
 
