@@ -136,7 +136,7 @@ func Respond(ctx context.Context, w http.ResponseWriter, source <-chan *Event, c
 	// Instruct nginx to disable buffering
 	w.Header().Set("X-Accel-Buffering", "no")
 
-	if cfg.Reconnect != 0 {
+	if cfg.Reconnect > 0 {
 		if _, err := fmt.Fprintf(w, "retry: %d\n\n", cfg.Reconnect/time.Millisecond); err != nil {
 			return err
 		}
