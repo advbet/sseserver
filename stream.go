@@ -78,11 +78,9 @@ type MultiStream interface {
 
 	// Stop closes event stream. It will disconnect all connected
 	// subscribers and deallocate all resources used for the stream. After
-	// stream is stopped it can not started again and should not be used
-	// anymore.
+	// stream is stopped it can not be started again and should not be used anymore.
 	//
-	// Calls to Publish or Subscribe after stream was stopped will cause
-	// panic.
+	// Calls to Publish or Subscribe after stream was stopped will cause panic.
 	Stop()
 
 	// SubscribeTopic handles HTTP request to receive SSE stream for a given

@@ -218,13 +218,11 @@ func NewCachedMultiStream(lastIDs map[string]string, cfg Config, expiration, cle
 }
 
 // Publish sends an event to the default topic ("").
-// The event is cached to support client resynchronization.
 func (s *CachedStream) Publish(event *Event) {
 	s.PublishTopic("", event)
 }
 
 // PublishTopic sends an event to the specified topic.
-// The event is cached to support client resynchronization.
 func (s *CachedStream) PublishTopic(topic string, event *Event) {
 	s.broker.publish(topic, event, func(lastID string) {
 		s.cache.add(topic, lastID, event)
@@ -232,8 +230,6 @@ func (s *CachedStream) PublishTopic(topic string, event *Event) {
 }
 
 // PublishBroadcast sends an event to all connected clients across all topics.
-// Broadcasted events are not cached and their IDs are removed to prevent
-// affecting the event sequence of any specific topic.
 func (s *CachedStream) PublishBroadcast(event *Event) {
 	// Cached SSE stream does not support tracking broadcasted events. This
 	// removes ID value from all broadcasted events.
@@ -242,36 +238,25 @@ func (s *CachedStream) PublishBroadcast(event *Event) {
 }
 
 // Subscribe adds a subscriber to the default topic ("") and starts sending
-// events to the provided response writer. If lastClientID is provided and
-// differs from the server's last event ID, it attempts to resynchronize
-// missing events from the cache.
-// Returns ErrCacheMiss if resynchronization is needed but events are not found in cache.
+// events to the provided response writer.
 func (s *CachedStream) Subscribe(ctx context.Context, w http.ResponseWriter, lastClientID string) error {
 	return s.SubscribeTopicFiltered(ctx, w, "", lastClientID, nil)
 }
 
 // SubscribeFiltered adds a subscriber to the default topic ("") with event filtering
-// and starts sending events to the provided response writer. The filter function
-// can be used to modify or exclude events before sending them to the client.
-// Returns ErrCacheMiss if resynchronization is needed but events are not found in cache.
+// and starts sending events to the provided response writer.
 func (s *CachedStream) SubscribeFiltered(ctx context.Context, w http.ResponseWriter, lastClientID string, f FilterFn) error {
 	return s.SubscribeTopicFiltered(ctx, w, "", lastClientID, f)
 }
 
 // SubscribeTopic adds a subscriber to the specified topic and starts sending
-// events to the provided response writer. If lastClientID is provided and
-// differs from the server's last event ID, it attempts to resynchronize
-// missing events from the cache.
-// Returns ErrCacheMiss if resynchronization is needed but events are not found in cache.
+// events to the provided response writer.
 func (s *CachedStream) SubscribeTopic(ctx context.Context, w http.ResponseWriter, topic string, lastClientID string) error {
 	return s.SubscribeTopicFiltered(ctx, w, topic, lastClientID, nil)
 }
 
 // SubscribeTopicFiltered adds a subscriber to the specified topic with event filtering
-// and starts sending events to the provided response writer. If lastClientID is provided and
-// differs from the server's last event ID, it attempts to resynchronize missing events from the cache.
-// The filter function can be used to modify or exclude events before sending them to the client.
-// Returns ErrCacheMiss if resynchronization is needed but events are not found in cache.
+// and starts sending events to the provided response writer.
 func (s *CachedStream) SubscribeTopicFiltered(ctx context.Context, w http.ResponseWriter, topic string, lastClientID string, filter FilterFn) error {
 	source := make(chan *Event, s.cfg.QueueLength)
 	lastServerID := s.broker.subscribe(topic, source)
@@ -307,8 +292,7 @@ func (s *CachedStream) DropSubscribers() {
 	close(s.responseStop)
 }
 
-// Stop gracefully shuts down the SSE stream by closing the underlying broker
-// and waiting for all related goroutines to finish.
+// Stop closes event stream.
 func (s *CachedStream) Stop() {
 	close(s.broker)
 	s.wg.Wait()
