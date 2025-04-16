@@ -292,7 +292,8 @@ func (s *CachedStream) DropSubscribers() {
 	close(s.responseStop)
 }
 
-// Stop closes event stream.
+// Stop gracefully shuts down the SSE stream by closing the underlying broker
+// and waiting for all related goroutines to finish.
 func (s *CachedStream) Stop() {
 	close(s.broker)
 	s.wg.Wait()
