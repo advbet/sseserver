@@ -22,7 +22,7 @@ func newEvent(topic string, id string) *sseserver.Event {
 
 func eventGenerator(stream sseserver.Stream) {
 	i := 0
-	c := time.Tick(10 * time.Second)
+	c := time.Tick(time.Second)
 
 	for range c {
 		i++
