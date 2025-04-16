@@ -6,4 +6,6 @@
 This is a golang library for creating web services that generate streams of
 [Server-Sent Events](https://www.w3.org/TR/eventsource/ "SSE").
 
-For example usage see `_example/` directory.
+For examples see `_examples/` directory.
+
+**NOTE:** Make sure your HTTP server `WriteTimeout` is bigger than Stream `Lifetime`.
