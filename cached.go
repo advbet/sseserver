@@ -183,13 +183,13 @@ var ErrCacheMiss = errors.New("missing events in cache")
 // this library is responsible for generating HTTP response to the client. It is
 // recommended to return 204 no content response to stop client from
 // reconnecting until he syncs event state manually.
-func NewCached(cfg Config, lastID string, expiration, cleanup time.Duration) *CachedStream {
-	return NewCachedMultiStream(cfg, map[string]string{"": lastID}, expiration, cleanup)
+func NewCached(cfg Config, lastEventID string, expiration, cleanup time.Duration) *CachedStream {
+	return NewCachedMultiStream(cfg, map[string]string{"": lastEventID}, expiration, cleanup)
 }
 
 // NewCachedMultiStream is similar to NewCached but allows setting initial last
 // event ID values for multiple topics.
-func NewCachedMultiStream(cfg Config, lastIDs map[string]string, expiration, cleanup time.Duration) *CachedStream {
+func NewCachedMultiStream(cfg Config, lastEventsIDs map[string]string, expiration, cleanup time.Duration) *CachedStream {
 	s := &CachedStream{
 		broker:       newBroker(),
 		cfg:          cfg,
@@ -203,7 +203,7 @@ func NewCachedMultiStream(cfg Config, lastIDs map[string]string, expiration, cle
 
 	go func() {
 		defer s.wg.Done()
-		s.broker.run(lastIDs)
+		s.broker.run(lastEventsIDs)
 		cancel()
 	}()
 
