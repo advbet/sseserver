@@ -8,7 +8,7 @@ Stream Types:
 * `CachedCountStream`: Fixed-size event caching
 * `LastOnlyStream`: Only resends the most recent event
 
-[![Godoc](https://godoc.org/github.com/advbet/sseserver?status.svg)](https://godoc.org/bitbucket.org/advbet/sseserver)
+[![Godoc](https://godoc.org/github.com/advbet/sseserver?status.svg)](https://godoc.org/github.com/advbet/sseserver/v2)
 
 ## Installation
 
