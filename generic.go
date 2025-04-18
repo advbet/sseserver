@@ -66,7 +66,7 @@ func (s *GenericStream) PublishBroadcast(event *Event) {
 // Subscribe adds a subscriber to the default topic ("") and starts sending
 // events to the provided response writer. Unlike cached implementations,
 // the GenericStream relies on the user-provided resync function to retrieve
-// missed events when a client reconnects.
+// missed events when a client reconnects with a lastEventID.
 // The connection remains open until closed by the client, server shutdown, or context cancellation.
 func (s *GenericStream) Subscribe(ctx context.Context, w http.ResponseWriter, lastEventID string) error {
 	return s.SubscribeTopicFiltered(ctx, w, "", lastEventID, nil)

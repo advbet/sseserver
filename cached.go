@@ -242,8 +242,10 @@ func (s *CachedStream) PublishBroadcast(event *Event) {
 // client reconnection by checking the lastEventID. If the client is connecting
 // for the first time or has seen the most recent event, it will receive new events
 // as they are published. If the client missed some events, it will attempt to
-// resynchronize from the cache. The connection remains open until closed by the client,
-// server shutdown, or context cancellation.
+// resynchronize from the cache.
+// If the requested events are no longer available in the cache, it returns ErrCacheMiss,
+// allowing the caller to handle the situation appropriately.
+// The connection remains open until closed by the client, server shutdown, or context cancellation.
 func (s *CachedStream) Subscribe(ctx context.Context, w http.ResponseWriter, lastEventID string) error {
 	return s.SubscribeTopicFiltered(ctx, w, "", lastEventID, nil)
 }
