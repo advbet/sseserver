@@ -19,7 +19,7 @@ go get -u github.com/advbet/sseserver/v2
 ## Notice
 
 Make sure your HTTP server `WriteTimeout` is bigger than Stream `Lifetime`, otherwise connections will be
-closed from HTTP server side and front will not be able to receive events.
+closed from HTTP server side and clients will not be able to receive events.
 
 ## Examples
 
