@@ -75,25 +75,38 @@ func (s *LastOnlyStream) PublishBroadcast(event *Event) {
 }
 
 // Subscribe adds a subscriber to the default topic ("") and starts sending
-// events to the provided response writer.
+// events to the provided response writer. This function sends the last event in the default topic,
+// then streams new events as they are published. Unlike other implementations,
+// LastOnlyStream does not maintain a historical event log - it only remembers the
+// most recent event of each event type per topic.
+// The connection remains open until closed by the client, server shutdown, or context cancellation.
 func (s *LastOnlyStream) Subscribe(ctx context.Context, w http.ResponseWriter, lastEventID string) error {
 	return s.SubscribeTopicFiltered(ctx, w, "", lastEventID, nil)
 }
 
 // SubscribeFiltered adds a subscriber to the default topic ("") with event filtering
-// and starts sending events to the provided response writer.
+// and starts sending events to the provided response writer. This function is provided
+// for interface compatibility, but LastOnlyStream does not support filtering and will
+// return an error if a filter function is provided. This limitation exists because
+// filters would complicate the "last event only" semantics of this implementation.
+// The connection remains open until closed by the client, server shutdown, or context cancellation.
 func (s *LastOnlyStream) SubscribeFiltered(ctx context.Context, w http.ResponseWriter, lastEventID string, f FilterFn) error {
 	return s.SubscribeTopicFiltered(ctx, w, "", lastEventID, f)
 }
 
 // SubscribeTopic adds a subscriber to the specified topic and starts sending
-// events to the provided response writer.
+// events to the provided response writer. Each topic maintains its own set of "last events".
+// The client will immediately receive the most recent event for each event in the topic,
+// then receive new events as they are published.
+// The connection remains open until closed by the client, server shutdown, or context cancellation.
 func (s *LastOnlyStream) SubscribeTopic(ctx context.Context, w http.ResponseWriter, topic string, lastEventID string) error {
 	return s.SubscribeTopicFiltered(ctx, w, topic, lastEventID, nil)
 }
 
 // SubscribeTopicFiltered adds a subscriber to the specified topic with event filtering
-// and starts sending events to the provided response writer.
+// and starts sending events to the provided response writer. Same as SubscribeTopic.
+// Note that filtering is not supported and will result in an error if attempted.
+// The connection remains open until closed by the client, server shutdown, or context cancellation.
 func (s *LastOnlyStream) SubscribeTopicFiltered(ctx context.Context, w http.ResponseWriter, topic string, lastEventID string, f FilterFn) error {
 	if f != nil {
 		return errFiltersNotSupported
