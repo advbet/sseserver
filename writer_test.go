@@ -232,3 +232,37 @@ func TestApplyFilter(t *testing.T) {
 		})
 	}
 }
+
+func TestRespondImmediateContextCancel(t *testing.T) {
+	t.Parallel()
+
+	// Create a source channel that won't be closed during the test
+	source := make(chan *Event)
+	// Ensure we clean up resources after test
+	defer close(source)
+
+	w := httptest.NewRecorder()
+
+	// Create a context and immediately cancel it before calling Respond
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // Cancel immediately
+
+	start := time.Now()
+	err := Respond(ctx, w, source, &Config{}, nil)
+	duration := time.Since(start)
+
+	// Respond should return quickly with nil error
+	if err != nil {
+		t.Errorf("Expected nil error for canceled context, got %v", err)
+	}
+
+	// Response should be almost immediate since context was already canceled
+	if duration > 50*time.Millisecond {
+		t.Errorf("Response took too long for already canceled context: %v", duration)
+	}
+
+	// Verify no data was written to the response
+	if len(w.Body.Bytes()) > 0 {
+		t.Errorf("Expected empty response body, got %q", w.Body.String())
+	}
+}
