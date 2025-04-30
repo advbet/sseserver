@@ -1,6 +1,7 @@
 package sseserver
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"sort"
@@ -45,13 +46,11 @@ func NewLastOnly(cfg Config) *LastOnlyStream {
 }
 
 // Publish sends an event to the default topic ("").
-// The event is cached to support client resynchronization.
 func (s *LastOnlyStream) Publish(event *Event) {
 	s.PublishTopic("", event)
 }
 
 // PublishTopic sends an event to the specified topic.
-// The event is cached to support client resynchronization.
 func (s *LastOnlyStream) PublishTopic(topic string, event *Event) {
 	//nolint:revive
 	s.broker.publish(topic, event, func(lastID string) {
@@ -67,8 +66,7 @@ func (s *LastOnlyStream) PublishTopic(topic string, event *Event) {
 	})
 }
 
-// PublishBroadcast for LastOnlyStream does not cache a broadcasted event
-// and thus does not permit sending an event with ID value.
+// PublishBroadcast sends an event to all connected clients across all topics.
 func (s *LastOnlyStream) PublishBroadcast(event *Event) {
 	// LastOnly SSE stream does not support tracking broadcasted events. This
 	// removes ID value from all broadcasted events.
@@ -77,37 +75,39 @@ func (s *LastOnlyStream) PublishBroadcast(event *Event) {
 }
 
 // Subscribe adds a subscriber to the default topic ("") and starts sending
-// events to the provided response writer. If lastEventID is provided and
-// differs from the server's last event ID, it attempts to resynchronize
-// missing events from the cache.
-// Returns ErrCacheMiss if resynchronization is needed but events are not found in cache.
-func (s *LastOnlyStream) Subscribe(w http.ResponseWriter, lastEventID string) error {
-	return s.SubscribeTopicFiltered(w, "", lastEventID, nil)
+// events to the provided response writer. This function sends the last event in the default topic,
+// then streams new events as they are published. Unlike other implementations,
+// LastOnlyStream does not maintain a historical event log - it only remembers the
+// most recent event of each event type per topic.
+// The connection remains open until closed by the client, server shutdown, or context cancellation.
+func (s *LastOnlyStream) Subscribe(ctx context.Context, w http.ResponseWriter, lastEventID string) error {
+	return s.SubscribeTopicFiltered(ctx, w, "", lastEventID, nil)
 }
 
 // SubscribeFiltered adds a subscriber to the default topic ("") with event filtering
-// and starts sending events to the provided response writer. The filter function
-// can be used to modify or exclude events before sending them to the client.
-// Returns ErrCacheMiss if resynchronization is needed but events are not found in cache.
-func (s *LastOnlyStream) SubscribeFiltered(w http.ResponseWriter, lastEventID string, f FilterFn) error {
-	return s.SubscribeTopicFiltered(w, "", lastEventID, f)
+// and starts sending events to the provided response writer. This function is provided
+// for interface compatibility, but LastOnlyStream does not support filtering and will
+// return an error if a filter function is provided. This limitation exists because
+// filters would complicate the "last event only" semantics of this implementation.
+// The connection remains open until closed by the client, server shutdown, or context cancellation.
+func (s *LastOnlyStream) SubscribeFiltered(ctx context.Context, w http.ResponseWriter, lastEventID string, f FilterFn) error {
+	return s.SubscribeTopicFiltered(ctx, w, "", lastEventID, f)
 }
 
 // SubscribeTopic adds a subscriber to the specified topic and starts sending
-// events to the provided response writer. If lastEventID is provided and
-// differs from the server's last event ID, it attempts to resynchronize
-// missing events from the cache.
-// Returns ErrCacheMiss if resynchronization is needed but events are not found in cache.
-func (s *LastOnlyStream) SubscribeTopic(w http.ResponseWriter, topic string, lastEventID string) error {
-	return s.SubscribeTopicFiltered(w, topic, lastEventID, nil)
+// events to the provided response writer. Each topic maintains its own set of "last events".
+// The client will immediately receive the most recent event for each event in the topic,
+// then receive new events as they are published.
+// The connection remains open until closed by the client, server shutdown, or context cancellation.
+func (s *LastOnlyStream) SubscribeTopic(ctx context.Context, w http.ResponseWriter, topic string, lastEventID string) error {
+	return s.SubscribeTopicFiltered(ctx, w, topic, lastEventID, nil)
 }
 
 // SubscribeTopicFiltered adds a subscriber to the specified topic with event filtering
-// and starts sending events to the provided response writer. If lastEventID is provided and
-// differs from the server's last event ID, it attempts to resynchronize missing events from the cache.
-// The filter function can be used to modify or exclude events before sending them to the client.
-// Returns ErrCacheMiss if resynchronization is needed but events are not found in cache.
-func (s *LastOnlyStream) SubscribeTopicFiltered(w http.ResponseWriter, topic string, lastEventID string, f FilterFn) error {
+// and starts sending events to the provided response writer. Same as SubscribeTopic.
+// Note that filtering is not supported and will result in an error if attempted.
+// The connection remains open until closed by the client, server shutdown, or context cancellation.
+func (s *LastOnlyStream) SubscribeTopicFiltered(ctx context.Context, w http.ResponseWriter, topic string, lastEventID string, f FilterFn) error {
 	if f != nil {
 		return errFiltersNotSupported
 	}
@@ -135,14 +135,13 @@ func (s *LastOnlyStream) SubscribeTopicFiltered(w http.ResponseWriter, topic str
 	s.RUnlock()
 
 	if len(events) > 0 {
-		return Respond(w, applyChanFilter(prependStream(events, source), f), &s.cfg, s.responseStop)
+		return Respond(ctx, w, applyChanFilter(prependStream(events, source), f), &s.cfg, s.responseStop)
 	}
 
-	return Respond(w, applyChanFilter(source, f), &s.cfg, s.responseStop)
+	return Respond(ctx, w, applyChanFilter(source, f), &s.cfg, s.responseStop)
 }
 
-// DropSubscribers closes all active connections to subscribers.
-// This forces clients to reconnect, which can be useful when server state changes.
+// DropSubscribers removes all currently active stream subscribers and close all active HTTP responses.
 func (s *LastOnlyStream) DropSubscribers() {
 	close(s.responseStop)
 }

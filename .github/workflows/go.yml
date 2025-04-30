@@ -12,7 +12,7 @@ jobs:
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v7
         with:
-          version: v2.0.2
+          version: v2.1.2
 
   go-test-matrix:
     runs-on: ubuntu-latest
@@ -20,7 +20,7 @@ jobs:
     strategy:
       max-parallel: 2
       matrix:
-        version: ['1.21', '1.22', '1.23', '1.24']
+        version: ['1.24']
 
     name: Go ${{ matrix.version }}
     steps:
@@ -36,3 +36,6 @@ jobs:
 
       - name: Test
         run: go test -v -race -failfast -timeout 60s ./...
+
+      - name: Build example
+        run: go build -C _examples/ .

@@ -30,7 +30,7 @@ func newBroker() brokerChan {
 	return make(chan command)
 }
 
-// publish broadcasts given event via broker to all of the subscribers.
+// publish broadcasts given event via broker to all the subscribers.
 //
 // prePublish will be called by broker before publishing event with last event
 // ID as an argument.

@@ -1,53 +1,26 @@
 # sseserver
 
+`sseserver` is a Go library for SSE streams, offering multiple caching strategies and flexible resync logic.
 
-[![Godoc](https://godoc.org/bitbucket.org/advbet/sseserver?status.svg)](https://godoc.org/bitbucket.org/advbet/sseserver)
+Stream Types:
+* `GenericStream`: Custom resync logic for maximum flexibility
+* `CachedStream`: Time-based caching of events
+* `CachedCountStream`: Fixed-size event caching
+* `LastOnlyStream`: Only resends the most recent event
 
-This is a golang library for creating web services that generate streams of
-[Server-Sent Events](https://www.w3.org/TR/eventsource/ "SSE").
+[![Godoc](https://godoc.org/github.com/advbet/sseserver/v2?status.svg)](https://godoc.org/github.com/advbet/sseserver/v2)
 
-Example usage:
-```go
-package main
+## Installation
 
-import (
-	"fmt"
-	"net/http"
-	"strconv"
-	"time"
-
-	"github.com/advbet/sseserver"
-)
-
-func eventSource(stream sseserver.Stream) {
-	for i := 0; true; i++ {
-		stream.Publish(&sseserver.Event{
-			ID:    strconv.Itoa(i),
-			Event: "counter",
-			Data: map[string]interface{}{
-				"msg": "ticks since start",
-				"val": i,
-			},
-		})
-		time.Sleep(time.Second)
-	}
-}
-
-func main() {
-	stream := sseserver.NewCached("", sseserver.DefaultConfig, 5*time.Minute, time.Minute)
-	go eventSource(stream)
-
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		id := r.Header.Get("Last-Event-ID")
-		if err := stream.Subscribe(w, id); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
-	})
-
-	fmt.Println(http.ListenAndServe(":8000", nil))
-
-	// Test with:
-	//   curl http://localhost:8000/
-	//   curl -H "Last-Event-ID: 5" http://localhost:8000/
-}
+```sh
+go get -u github.com/advbet/sseserver/v2
 ```
+
+## Notice
+
+Make sure your HTTP server `WriteTimeout` is bigger than Stream `Lifetime`, otherwise connections will be
+closed from HTTP server side and clients will not be able to receive events.
+
+## Examples
+
+See `_examples/` directory.

@@ -1,6 +1,9 @@
 package sseserver
 
-import "net/http"
+import (
+	"context"
+	"net/http"
+)
 
 // Stream is an abstraction of SSE stream. Single instance of stream should be
 // created for each SSE stream available in the application. Application can
@@ -38,12 +41,12 @@ type Stream interface {
 	// the request.
 	//
 	// Subscribe on a stopped stream will cause panic.
-	Subscribe(w http.ResponseWriter, lastEventID string) error
+	Subscribe(ctx context.Context, w http.ResponseWriter, lastEventID string) error
 
 	// SubscribeFiltered is similar to Subscribe but each event before being
 	// sent to client will be passed to given filtering function. Events
 	// returned by the filtering function will be used instead.
-	SubscribeFiltered(w http.ResponseWriter, lastEventID string, f FilterFn) error
+	SubscribeFiltered(ctx context.Context, w http.ResponseWriter, lastEventID string, f FilterFn) error
 }
 
 // MultiStream is an abstraction of multiple SSE streams. Single instance of
@@ -75,24 +78,22 @@ type MultiStream interface {
 
 	// Stop closes event stream. It will disconnect all connected
 	// subscribers and deallocate all resources used for the stream. After
-	// stream is stopped it can not started again and should not be used
-	// anymore.
+	// stream is stopped it can not be started again and should not be used anymore.
 	//
-	// Calls to Publish or Subscribe after stream was stopped will cause
-	// panic.
+	// Calls to Publish or Subscribe after stream was stopped will cause panic.
 	Stop()
 
-	// Subscribe handles HTTP request to receive SSE stream for a given
+	// SubscribeTopic handles HTTP request to receive SSE stream for a given
 	// topic. Caller is responsible for extracting Last event ID value from
 	// the request.
 	//
 	// Subscribe on a stopped stream will cause panic.
-	SubscribeTopic(w http.ResponseWriter, topic string, lastEventID string) error
+	SubscribeTopic(ctx context.Context, w http.ResponseWriter, topic string, lastEventID string) error
 
-	// SubscribeFiltered is similar to Subscribe but each event before being
+	// SubscribeTopicFiltered is similar to Subscribe but each event before being
 	// sent to client will be passed to given filtering function. Events
 	// returned by the filtering function will be used instead.
-	SubscribeTopicFiltered(w http.ResponseWriter, topic string, lastEventID string, f FilterFn) error
+	SubscribeTopicFiltered(ctx context.Context, w http.ResponseWriter, topic string, lastEventID string, f FilterFn) error
 }
 
 // ResyncFn is a definition of function used to lookup events missed by
@@ -118,7 +119,7 @@ type MultiStream interface {
 //
 // Correct implementation of this function is essential for proper client
 // resync and vital to whole SSE functionality.
-type ResyncFn func(topic string, fromID, toID string) (events []Event, err error)
+type ResyncFn func(ctx context.Context, topic string, fromID, toID string) (events []Event, err error)
 
 // FilterFn is a callback function used to mutate event stream for individual
 // subscriptions. This function will be invoked for each event before sending it

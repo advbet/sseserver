@@ -1,3 +1,3 @@
-module github.com/advbet/sseserver
+module github.com/advbet/sseserver/v2
 
-go 1.21
+go 1.24
