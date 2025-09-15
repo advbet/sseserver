@@ -302,6 +302,19 @@ func (s *CachedStream) SubscribeTopicFiltered(ctx context.Context, w http.Respon
 	if miss {
 		// this can be deceiving as sometimes the client might be
 		// ahead of the server and in fact be too early.
+		resyncEvent := Event{
+			ID: lastServerID,
+			Data: map[string]interface{}{
+				"message": "resync required",
+			},
+		}
+
+		Respond(ctx, w,
+			prependStream([]Event{resyncEvent}, nil),
+			&s.cfg,
+			s.responseStop,
+		)
+
 		return ErrCacheMiss
 	}
 

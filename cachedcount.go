@@ -150,6 +150,18 @@ func (s *CachedCountStream) SubscribeTopicFiltered(ctx context.Context, w http.R
 		event, ok := s.events[topicIDKey(topic, lastEventID)]
 		if !ok {
 			s.mu.RUnlock()
+			resyncEvent := Event{
+				ID: lastServerID,
+				Data: map[string]interface{}{
+					"message": "resync required",
+				},
+			}
+
+			Respond(ctx, w,
+				prependStream([]Event{resyncEvent}, nil),
+				&s.cfg,
+				s.responseStop,
+			)
 
 			return ErrCacheMiss
 		}
