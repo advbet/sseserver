@@ -156,7 +156,12 @@ func (s *CachedCountStream) SubscribeTopicFiltered(ctx context.Context, w http.R
 					"message": "resync required",
 				},
 			}
-			Respond(ctx, w, prependStream([]Event{resyncEvent}, nil), &s.cfg, s.responseStop)
+
+			err := Respond(ctx, w, prependStream([]Event{resyncEvent}, nil), &s.cfg, s.responseStop)
+			if err != nil {
+				return err
+			}
+
 			return ErrCacheMiss
 		}
 
