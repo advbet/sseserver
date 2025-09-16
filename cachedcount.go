@@ -159,7 +159,6 @@ func (s *CachedCountStream) SubscribeTopicFiltered(ctx context.Context, w http.R
 			}
 
 			err := Respond(ctx, w, prependStream([]Event{resyncEvent}, nil), &s.cfg, s.responseStop)
-
 			if err != nil {
 				return err
 			}
