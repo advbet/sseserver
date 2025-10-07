@@ -51,6 +51,20 @@ type Event struct {
 	Data  interface{} // Data value will be marshaled to JSON
 }
 
+const (
+	ResyncRequiredError = "resyncRequired"
+)
+
+func NewErrorEvent(errorType string, details interface{}) Event {
+	return Event{
+		Event: "error",
+		Data: map[string]interface{}{
+			"error": errorType,
+			"data":  details,
+		},
+	}
+}
+
 // DefaultConfig is a recommended SSE configuration.
 var DefaultConfig = Config{
 	Reconnect:             500 * time.Millisecond,

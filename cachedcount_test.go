@@ -43,6 +43,7 @@ func TestCachedCountResync(t *testing.T) {
 	w = httptest.NewRecorder()
 	// cache size limit passed
 	err := stream.Subscribe(t.Context(), w, "first")
+	assertReceivedEvents(t, w, NewErrorEvent(ResyncRequiredError, map[string]interface{}{}))
 	if !errors.Is(err, ErrCacheMiss) {
 		t.Errorf("Expected error: %v, got: %v", ErrCacheMiss, err)
 	}
@@ -89,6 +90,7 @@ func TestCachedCountError(t *testing.T) {
 	w := httptest.NewRecorder()
 	// resyncing from non-existent event ID should return error
 	err := stream.Subscribe(t.Context(), w, "non existent")
+	assertReceivedEvents(t, w, NewErrorEvent(ResyncRequiredError, map[string]interface{}{}))
 	if !errors.Is(err, ErrCacheMiss) {
 		t.Errorf("Expected error: %v, got: %v", ErrCacheMiss, err)
 	}
