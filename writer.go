@@ -52,9 +52,11 @@ type Event struct {
 }
 
 const (
+	// ResyncRequiredError is the error type for resync required events.
 	ResyncRequiredError = "resyncRequired"
 )
 
+// NewErrorEvent creates a new error event with the specified error type and details.
 func NewErrorEvent(errorType string, details interface{}) Event {
 	return Event{
 		Event: "error",
