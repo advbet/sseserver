@@ -303,7 +303,7 @@ func (s *CachedStream) SubscribeTopicFiltered(ctx context.Context, w http.Respon
 	if miss {
 		// this can be deceiving as sometimes the client might be
 		// ahead of the server and in fact be too early.
-		err := Respond(ctx, w, prependStream([]Event{NewErrorEvent(ResyncRequiredError, map[string]interface{}{})}, nil), &s.cfg, s.responseStop)
+		err := Respond(ctx, w, prependStream([]Event{ResyncRequiredErrorEvent()}, nil), &s.cfg, s.responseStop)
 		if err != nil {
 			return err
 		}

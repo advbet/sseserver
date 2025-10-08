@@ -151,7 +151,7 @@ func (s *CachedCountStream) SubscribeTopicFiltered(ctx context.Context, w http.R
 		if !ok {
 			s.mu.RUnlock()
 
-			err := Respond(ctx, w, prependStream([]Event{NewErrorEvent(ResyncRequiredError, map[string]interface{}{})}, nil), &s.cfg, s.responseStop)
+			err := Respond(ctx, w, prependStream([]Event{ResyncRequiredErrorEvent()}, nil), &s.cfg, s.responseStop)
 			if err != nil {
 				return err
 			}

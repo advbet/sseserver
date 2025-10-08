@@ -51,18 +51,13 @@ type Event struct {
 	Data  interface{} // Data value will be marshaled to JSON
 }
 
-const (
-	// ResyncRequiredError is the error type for resync required events.
-	ResyncRequiredError = "resyncRequired"
-)
-
-// NewErrorEvent creates a new error event with the specified error type and details.
-func NewErrorEvent(errorType string, details interface{}) Event {
+// ResyncRequiredErrorEvent is the error event sent when a resync is required.
+func ResyncRequiredErrorEvent() Event {
 	return Event{
 		Event: "error",
-		Data: map[string]interface{}{
-			"error": errorType,
-			"data":  details,
+		Data: map[string]any{
+			"error": "resyncRequired",
+			"data":  map[string]any{},
 		},
 	}
 }
