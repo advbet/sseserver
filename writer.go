@@ -58,11 +58,11 @@ type ErrorEventData struct {
 }
 
 // ErrorEvent creates a new error event with given error type and optional details.
-func ErrorEvent(error string, data map[string]any) Event {
+func ErrorEvent(err string, data map[string]any) Event {
 	return Event{
 		Event: "error",
 		Data: ErrorEventData{
-			Error: error,
+			Error: err,
 			Data:  data,
 		},
 	}
