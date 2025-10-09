@@ -51,6 +51,28 @@ type Event struct {
 	Data  interface{} // Data value will be marshaled to JSON
 }
 
+// ErrorEventData holds data for error event in SSE stream.
+type ErrorEventData struct {
+	Error string         `json:"error"`
+	Data  map[string]any `json:"data,omitempty"`
+}
+
+// ErrorEvent creates a new error event with given error type and optional details.
+func ErrorEvent(err string, data map[string]any) Event {
+	return Event{
+		Event: "error",
+		Data: ErrorEventData{
+			Error: err,
+			Data:  data,
+		},
+	}
+}
+
+// ResyncRequiredErrorEvent is the error event sent when a resync is required.
+func ResyncRequiredErrorEvent() Event {
+	return ErrorEvent("resyncRequired", nil)
+}
+
 // DefaultConfig is a recommended SSE configuration.
 var DefaultConfig = Config{
 	Reconnect:             500 * time.Millisecond,
